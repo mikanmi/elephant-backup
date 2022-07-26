@@ -1,2 +1,2 @@
 # elephant-backup
-Elephant Backup backs up your ZFS pool.
+Elephant Backup backs up any ZFS filesystem to one another.
