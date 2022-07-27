@@ -83,9 +83,9 @@ export class Logger {
         // Get the caller calling the public methods of this instance.
         const caller = getCaller();
 
-        const shortDtate = dateString.split('T');
+        const shortDate = dateString.split('T');
         const consolePrefix = 
-                `[${shortDtate[1]}][${level[0]}]`;
+                `[${shortDate[1]}][${level[0]}]`;
         console.log(`${consolePrefix} ${message}`);
 
         const writablePrefix = 
@@ -169,7 +169,8 @@ function getCaller() {
     const err = new Error;
     // Capture the current stack trace by calling captureStackTrace and attaching err.stack.
     Error.captureStackTrace(err, getCaller);
-    err.stack;
+
+    err.stack; // NOSONAR
 
     Error.prepareStackTrace = original;
 

@@ -23,7 +23,6 @@ export class CommandLine {
 
     #subCommand = this.#program;
 
-    #command = '';
     #targets = [''];
     #options = 
             {archive: 'unexpected', dryRun: false, verbose: false};
@@ -54,20 +53,19 @@ export class CommandLine {
         this.#program.parse();
 
         this.#options = this.#subCommand.opts();
-        this.#command = this.#program.args[0];
     }
 
     /**
      * Get the sub command.
-     * @retruns {string}
+     * @returns {string}
      */
-    get command() {
-        return this.#command;
+    get subcommand() {
+        return this.#program.args[0];
     }
 
     /**
      * Get the command targets.
-     * @retruns {string[]}
+     * @returns {string[]}
      */
     get targets() {
         return this.#targets;
@@ -75,7 +73,7 @@ export class CommandLine {
 
     /**
      * Get the command options.
-     * @retruns {{archive: string, dryRun: boolean, verbose: boolean}}
+     * @returns {{archive: string, dryRun: boolean, verbose: boolean}}
      */
     get options() {
         return this.#options;

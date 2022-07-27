@@ -8,10 +8,6 @@
 
 import EventEmitter from 'node:events';
 
-import { Logger } from './Logger.js';
-
-const logger = Logger.getLogger();
-
 export class Lock {
     /** @type {boolean} */
     #acquired;

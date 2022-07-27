@@ -30,10 +30,10 @@ export class Command {
 
     /**
      * Construct a Command instance with a command line.
-     * @param {string} commandLine a command line.
+     * @param {string} command a command line.
      */
-    constructor(commandLine) {
-        this.#command = commandLine;
+    constructor(command) {
+        this.#command = command;
     }
 
     /**
@@ -58,7 +58,6 @@ export class Command {
         }
         else {
             subprocess.stdout.on('data', (data) => {
-                // logger.print(data.toString('utf8'));
                 logger.print(`\n${data.toString().trimEnd()}`);
             });
         }

@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "es2017",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "resolveJsonModule": true,
 
     "strict": true,
@@ -20,6 +20,8 @@
     "noPropertyAccessFromIndexSignature": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+
+    "outDir": "./built"
   },
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Recommended"

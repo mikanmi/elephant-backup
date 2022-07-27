@@ -123,7 +123,7 @@ export class ZfsFilesystem {
      * @param {string} last the last snapshot. send only one snapshot if last is empty string.
      */
     backup(archive, first, last = '') {
-        ZfsUtilities.sendAndReceiveZfsfilesystem(archive, this.#name, first, last);
+        ZfsUtilities.sendAndReceiveZfsFilesystem(archive, this.#name, first, last);
     }
 
     /**

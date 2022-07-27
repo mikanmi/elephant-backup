@@ -40,7 +40,7 @@ class ZfsCommands {
     /**
      * @types {string} The command line that receives a ZFS filesystem.
      */
-    static ZFS_RECV_INCLIMENTAL_DEPLICATE = 'zfs recv -F -d'
+    static ZFS_RECV_INCREMENTAL = 'zfs recv -F -d'
 
     /**
      * @types {string} The command line that diffs a snapshot and current on the a filesystem.
@@ -115,9 +115,9 @@ export class ZfsUtilities {
      * @param {string} first the first snapshot on the ZFS filesystem.
      * @param {string} last the last snapshot on the ZFS filesystem.
      */
-    static sendAndReceiveZfsfilesystem(archive, filesystem, first, last = '') {
-        const intermidiate = last == '' ? '' : '-I';
-        const estimateOption = `-n -v ${intermidiate}`;
+    static sendAndReceiveZfsFilesystem(archive, filesystem, first, last = '') {
+        const intermediate = last == '' ? '' : '-I';
+        const estimateOption = `-n -v ${intermediate}`;
 
         const dryRun = commandArguments.options.dryRun ? '-n' : '';
         const verbose = commandArguments.options.verbose ? '-v' : '';
@@ -134,7 +134,7 @@ export class ZfsUtilities {
         // Spawn the backup command after creating and building a backup commands.
         // Building the send command of the filesystem.
         const sendCommandLine = 
-                `${ZfsCommands.ZFS_SEND_RAW} ${dryRun} ${verbose} ${intermidiate} ${firstSnapshot} ${lastSnapshot}`;
+                `${ZfsCommands.ZFS_SEND_RAW} ${dryRun} ${verbose} ${intermediate} ${firstSnapshot} ${lastSnapshot}`;
         const sendCommand = new Command(sendCommandLine);
 
         // the PV command to show a progress of transportation.
@@ -143,7 +143,7 @@ export class ZfsUtilities {
 
         // Building the receive command of the filesystem.
         const receiveCommandLine =
-                `${ZfsCommands.ZFS_RECV_INCLIMENTAL_DEPLICATE} -x mountpoint ${archive}`;
+                `${ZfsCommands.ZFS_RECV_INCREMENTAL} -x mountpoint ${archive}`;
         const receiveCommand = new Command(receiveCommandLine);
         pvCommand.add(receiveCommand);
 
@@ -158,7 +158,7 @@ export class ZfsUtilities {
     static diff(snapshot, filesystem) {
         const zfsCommand = `${ZfsCommands.ZFS_DIFF} ${snapshot} ${filesystem}`
         const command = new Command(zfsCommand);
-        command.spawn();
+        command.spawnIfNoDryRun();
     }
 
     /**
@@ -191,5 +191,19 @@ export class ZfsUtilities {
 
         logger.debug(`Snapshots on ${filesystem}: ${snapshots}`);
         return snapshots;
+    }
+
+    /**
+     * @return {boolean} true if the super user runs Elephant Backup, otherwise false.
+     */
+    static isSuperUser() {
+        // geteuid and getuid are possibly undefined.
+        if (!process.geteuid || !process.getuid) {
+            return false;
+        }
+
+        const euid = process.geteuid();
+        const uid = process.getuid();
+        return euid == 0 && uid == 0;
     }
 }

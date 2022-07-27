@@ -11,7 +11,6 @@ import { ZfsFilesystem } from './ZfsFilesystem.js';
 import { ZfsUtilities } from './ZfsUtilities.js';
 import { Logger } from './Logger.js';
 
-
 const logger = Logger.getLogger()
 const commandLine = CommandLine.getCommandLine();
 
@@ -24,6 +23,11 @@ export class DiffSubcommand {
 
         const targets = commandLine.targets;
         const options = commandLine.options;
+
+        if (!commandLine.options.dryRun && !ZfsUtilities.isSuperUser()) {
+            // run the diff Subcommand of Elephant Backup on a normal user.
+            logger.exit(`Run the ${commandLine.subcommand} on the SUPER user.`);
+        }
 
         // exit if the specified ZFS filesystems do not exist on the machine.
         const list = ZfsUtilities.filesystemList();
@@ -65,6 +69,3 @@ export class DiffSubcommand {
         primaryFilesystem.diff(latestOfCommonSnapshots);
     }
 }
-
-
-

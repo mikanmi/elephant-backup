@@ -18,9 +18,9 @@ const logger = Logger.getLogger();
 const logFile = fs.createWriteStream(`${process.cwd()}/elephant-backup.log`);
 
 // This is the entry point of this application.
-entry();
+main();
 
-export default function entry() {
+export default function main() {
     const commandLine = CommandLine.getCommandLine();
     commandLine.configure();
     commandLine.parse();
@@ -33,12 +33,12 @@ export default function entry() {
     logger.print(`===== Start Elephant Backup =====`);
     logger.debug(process.argv);
 
-    logger.info(`Subcommand: ${commandLine.command}`);
+    logger.info(`Subcommand: ${commandLine.subcommand}`);
     logger.info(`options => `);
     logger.info(commandLine.options);
     logger.info(`targets: ${commandLine.targets}`);
 
-    switch (commandLine.command) {
+    switch (commandLine.subcommand) {
         case CommandType.BACKUP:
             const backupSubcommand = new BackupSubcommand();
             backupSubcommand.run();
@@ -48,23 +48,4 @@ export default function entry() {
             diffSubcommand.run();
             break;
     }
-
-    const isRoot = isRootUser();
-    if (isRoot) {
-        
-    }
-}
-
-/**
- * @return {boolean} true if the root user runs, otherwise false.
- */
-function isRootUser() {
-    // geteuid and getuid are possibly undefined
-    if (!process.geteuid || !process.getuid) {
-        return false;
-    }
-
-    const euid = process.geteuid();
-    const uid = process.getuid();
-    return euid == 0 && uid == 0;
 }
