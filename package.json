@@ -3,6 +3,7 @@
   "displayName": "Elephant Backup",
   "name": "elephant-backup",
   "version": "0.0.1",
+  "bin": "src/main.js",
   "description": "Elephant Backup is an easy backup CLI to archive any number of ZFS filesystems containing lots of snapshots to another ZFS filesystem.",
   "license": "BSD 2-Clause",
   "repository": {
@@ -19,13 +20,17 @@
   "type": "module",
   "author": "Patineboot",
   "keywords": [
+    "Elephant",
     "Elephant Backup",
     "elephant-backup",
-    "Elephant",
     "Backup",
-    "Archive"
+    "Archive",
+    "ZFS",
+    "INCREMENTAL"
   ],
-  "scripts": {},
+  "scripts": {
+    "start": "node src/main.js"
+  },
   "dependencies": {
     "commander": "^9.3.0"
   },
