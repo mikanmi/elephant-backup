@@ -10,18 +10,15 @@ import child_process from 'node:child_process';
 import stream from 'node:stream';
 import { Logger } from './Logger.js';
 import { CommandLine } from './CommandLine.js';
-import { Lock } from './Lock.js';
 
 const logger = Logger.getLogger();
-const commandLine = CommandLine.getCommandLine();
-const lock = new Lock();
+
 
 export class Command {
-
     /**
      * @type {string} a command with arguments.
      */
-    #command;
+    #commandWithArguments;
 
     /**
      * @type {Command|null} a command to be piped.
@@ -29,151 +26,133 @@ export class Command {
     #nextCommand = null;
 
     /**
-     * Construct a Command instance with a command line.
-     * @param {string} command a command line.
+     * Print the standard error on the standard error of the application.
+     * @type {boolean}
      */
-    constructor(command) {
-        this.#command = command;
+    printStderrDirect = false;
+
+    /**
+     * Print the standard out immediately.
+     * @type {boolean}
+     */
+    printStdoutImmediately = false;
+
+    /**
+     * Construct a Command instance with a command line.
+     * @param {string} commandWithArgs a command line.
+     */
+    constructor(commandWithArgs) {
+        this.#commandWithArguments = commandWithArgs;
+    }
+
+    /**
+     * Spawn the command line if not DryRun.
+     * @param {stream.Readable|null} stdin supply the command a standard input. No supply if null.
+     * @return {Promise<string>} The result of spawn the command line.
+     */
+     async spawnIfNoDryRunAsync(stdin = null) {
+        const commandLine = CommandLine.getInstance();
+
+        const result = commandLine.options.dryRun ?
+             await this.#spawnDryRunAsync(stdin) :
+             await this.spawnAsync(stdin);
+        return result;
     }
 
     /**
      * Spawn the command line.
      * @param {stream.Readable|null} stdin the command running with the standard input.
+     * @return {Promise<string>} The result of spawn the command line.
      */
-    spawn(stdin = null) {
-        logger.info(`Spawn CMD: ${this.#command} / stdin: ${stdin}`);
+     async spawnAsync(stdin = null) {
+        logger.info(`Spawn CMD: ${this.#commandWithArguments} / stdin: ${stdin}`);
 
-        const tokens = this.#command.split(' ').filter(s => s != '');
+        const tokens = this.#commandWithArguments.split(' ').filter(s => s != '');
         const cmd = tokens[0];
         tokens.splice(0, 1);
 
-        const subprocess =
-                child_process.spawn(cmd, tokens, { stdio: ['pipe', 'pipe', process.stderr] });
-        if (stdin) {
-            stdin.pipe(subprocess.stdin);
+        const child = this.printStderrDirect ?
+                child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', process.stderr]}) :
+                child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'pipe']});
+
+        const promises = [];
+
+        // relay the stdin variable to the child's stdin.
+        stdin?.pipe(child.stdin);
+
+        // bind the child's stdout and the next command's stdin. 
+        if (this.#nextCommand) {
+            const nextPromise = this.#nextCommand.spawnAsync(child.stdout);
+            promises.push(nextPromise);
         }
 
-        if (this.#nextCommand) {
-            this.#nextCommand.spawn(subprocess.stdout);
-        }
-        else {
-            subprocess.stdout.on('data', (data) => {
-                logger.print(`\n${data.toString().trimEnd()}`);
+        // prepare handlers of the command event.
+        const promise = this.#createPromise(child);
+        promises.push(promise);
+
+        const stdout = await Promise.all(promises);
+
+        return stdout[0];
+    }
+
+    /**
+     * @param {child_process.ChildProcess} child
+     * @return {Promise<string>}
+     */
+    #createPromise(child) {
+        let stdout = '';
+
+        const promise = new Promise((resolve, _) => {
+            child.stdout?.on('data', (data) => {
+                const dataString = data.toString().trimEnd();
+                stdout += dataString;
+                if (this.printStdoutImmediately) {
+                    // print the child's stdout immediately on the application stdout.
+                    logger.print(`\n${dataString}`);
+                }
             });
-        }
-        // subprocess.stderr.on('data', (data) => {
-        //    logger.error(data.toString());
-        // });
-        subprocess.on('spawn', async() => {
-            await lock.acquire();
-            logger.info(`Spawned: ${this.#command}`);
-        });
-        subprocess.on('exit', (code, signal) => {
-            logger.debug(`${this.#command} exit with code: ${code} / signal: ${signal}`);
-            lock.release();
-        });
-        subprocess.on('error', (err) => {
-            logger.debug(`Error Command: ${this.#command}`);
-            throw err;
-        });
-        subprocess.on('close', (code, signal) => {
-            logger.debug(`${this.#command} close with code: ${code} / signal: ${signal}`);
-        });
+            // stderr is undefined if printStderrDirect is true.
+            child.stderr?.on('data', (data) => {
+                const dataString = data.toString().trimEnd();
+                // print the child's stderr immediately on the application stdout.
+                logger.error(`${dataString}`);
+            });
 
-        return;
+            child.on('spawn', () => {
+                logger.info(`Spawned: ${this.#commandWithArguments}`);
+            });
+            child.on('exit', (code, signal) => {
+                logger.debug(`${this.#commandWithArguments} exit with code: ${code} / signal: ${signal}`);
+            });    
+            child.on('error', (err) => {
+                logger.debug(`Error Command: ${this.#commandWithArguments}`);
+                throw err;
+            });
+            child.on('close', (code, signal) => {
+                logger.debug(`${this.#commandWithArguments} close with code: ${code} / signal: ${signal}`);
+                resolve(stdout);
+            });
+        });
+        return promise;
     }
-
+    
     /**
-     * Spawn the command line synchronously.
-     * @param {Buffer|null} input supply the command a standard input. No supply if null.
-     * @returns {{stdout: string, stderr: string, status: number}}
-     */
-    spawnSync(input = null) {
-        logger.info(`SpawnSync CMD: ${this.#command} / input: ${input}`);
-
-        const tokens = this.#command.split(' ').filter(s => s != '');
-        const cmd = tokens[0];
-        tokens.splice(0, 1);
-
-        const spawnReturns = input ?
-                    child_process.spawnSync(cmd, tokens, { input: input }):
-                    child_process.spawnSync(cmd, tokens);
-        if (spawnReturns.error) {
-            throw spawnReturns.error;
-        }
-
-        let result = {
-            stdout: spawnReturns.stdout.toString().trimEnd(),
-            stderr: spawnReturns.stderr.toString().trimEnd(),
-            status: spawnReturns.status ?? -1,
-        }
-
-        if (this.#nextCommand) {
-            result = this.#nextCommand.spawnSync(spawnReturns.stdout);
-        }
-        return result;
-    }
-
-    /**
-     * [DryRun] Spawn the command line.
+     * [DryRun] Spawn the command line the same interface as spawnAsync.
      * @param {stream.Readable|null} stdin the command running with the standard input.
+     * @return {Promise<string>} The result of spawn the command line.
      */
-    #spawnDryRun(stdin = null) {
-        logger.info(`spawnDryRun CMD: ${this.#command} / stdin: ${stdin}`);
+     async #spawnDryRunAsync(stdin = null) {
+        logger.info(`spawnDryRunAsync CMD: ${this.#commandWithArguments} / stdin: ${stdin}`);
 
+        let result = '';
         if (this.#nextCommand) {
-            this.#nextCommand.#spawnDryRun(stdin);
-        }
-        return;
-    }
-
-    /**
-     * [DryRun] Spawn the command line synchronously.
-     * @param {Buffer|null} input supply the command a standard input. No supply if null.
-     * @returns {{stdout: string, stderr: string, status: number}}
-     */
-    #spawnSyncDryRun(input = null) {
-        logger.info(`spawnSyncDryRun CMD: ${this.#command} / input: ${input}`);
-
-        let result = {
-            stdout: '',
-            stderr: '',
-            status: 0,
-        }
-        if (this.#nextCommand) {
-            result = this.#nextCommand.#spawnSyncDryRun();
+            result = await this.#nextCommand.#spawnDryRunAsync(stdin);
         }
         return result;
     }
 
     /**
-     * Spawn the command line for DryRun.
-     * @param {stream.Readable|null} input supply the command a standard input. No supply if null.
-     */
-    spawnIfNoDryRun(input = null) {
-        if (commandLine.options.dryRun) {
-            this.#spawnDryRun(input);
-        }
-        else {
-            this.spawn(input);
-        }
-        return;
-    }
-
-    /**
-     * Spawn sync the command line for DryRun.
-     * @param {Buffer|null} input supply the command a standard input. No supply if null.
-     * @returns {{stdout: string, stderr: string, status: number}}
-     */
-    spawnSyncIfNoDryRun(input = null) {
-        const result =
-                commandLine.options.dryRun?
-                this.#spawnSyncDryRun(input) :
-                this.spawnSync(input);
-        return result;
-    }
-
-    /**
+     * Add a command to this instance.
      * @param {Command} command a command to be piped.
      */
     add(command) {

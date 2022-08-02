@@ -39,7 +39,7 @@ export class SnapshotList {
     /**
      * Find the snapshot that common and earliest.
      * @param {SnapshotList} snapshots A list of snapshots.
-     * @returns the snapshot if found, otherwise null.
+     * @returns  {string|null} the snapshot if found, otherwise null.
      */
     findLatest(snapshots) {
         const filter = snapshots.#snapshots;
@@ -53,31 +53,24 @@ export class SnapshotList {
 
     /**
      * Get the earliest snapshot.
-     * @returns the latest snapshot if exist, otherwise null.
+     * @returns  {string|null} the latest snapshot if exist, otherwise null.
      */
      getEarliest() {
-        let result = null;
-        if (this.#snapshots.length > 0) {
-            result = this.#snapshots[0];
-        }
-
+        const result = this.#snapshots.length > 0 ? this.#snapshots[0] : null;
         return result;
      }
 
     /**
      * Get the latest snapshot.
-     * @returns the latest snapshot if exist, otherwise null.
+     * @returns {string|null} the latest snapshot if exist, otherwise null.
      */
      getLatest() {
-        let result = null;
+        const snapshots = this.#snapshots;
+        const length = snapshots.length;
 
-        const length = this.#snapshots.length;
-        if (length > 0) {
-            result = this.#snapshots[length-1];
-        }
+        const result = length > 0 ? snapshots[length - 1] : null;
 
         logger.debug(result);
-
         return result;
      }
 
@@ -86,6 +79,7 @@ export class SnapshotList {
 export class ZfsFilesystem {
 
     #name = 'Unexpected filesystem';
+
     /** @type {string|null} */
     #newSnapshot = null;
 
@@ -102,45 +96,67 @@ export class ZfsFilesystem {
      * @param {string} dataset the name of a ZFS dataset to create.
      * @returns the created ZFS dataset.
      */
-    create(dataset) {
-        ZfsUtilities.createZfsDataset(dataset, this.#name);
+    async create(dataset) {
+        await ZfsUtilities.createZfsDataset(dataset, this.#name);
         return new ZfsFilesystem(`${this.#name}/${dataset}`);
     }
 
     /**
-     * Make a ZfsFilesystem instance.
-     * @param {string} dataset the name of a ZFS dataset to make a instance.
-     * @returns a ZfsFilesystem instance made from dataset.
+     * Open the ZFS dataset on the filesystem.
+     * @param {string} dataset the name of a ZFS dataset to open.
+     * @returns {ZfsFilesystem} a ZfsFilesystem instance associated with the dataset.
      */
-    make(dataset) {
+     open(dataset) {
         return new ZfsFilesystem(`${this.#name}/${dataset}`);
     }
 
     /**
-     * back up snapshots between first and last on the filesystem.
+     * Open all of the ZFS datasets contained in the filesystem.
+     * @returns {Promise<ZfsFilesystem[]>} a ZfsFilesystem array of all the ZFS datasets contained in the filesystem.
+     */
+     async openRecursively() {
+        const filesystems = await ZfsUtilities.filesystemListRecursively(this.#name);
+        const zfsFilesystems = 
+                filesystems.map((filesystem) => new ZfsFilesystem(filesystem));
+        return zfsFilesystems;
+    }
+
+    /**
+     * Estimate the send size of the snapshots between first and last on the ZFS filesystem.
+     * @param {string} first the first snapshot.
+     * @param {string} last the last snapshot. send the only one snapshot if last is empty string.
+     * @return {Promise<string>} the estimated size.
+     */
+    async estimateBackupSize(first, last = '') {
+        const result = await ZfsUtilities.estimateSendSize(this.#name, first, last);
+        return result;
+    }
+
+    /**
+     * Back up the snapshots between first and last on the filesystem.
      * @param {string} archive a ZFS filesystem to store the filesystem.
      * @param {string} first the first snapshot.
      * @param {string} last the last snapshot. send only one snapshot if last is empty string.
      */
-    backup(archive, first, last = '') {
-        ZfsUtilities.sendAndReceiveZfsFilesystem(archive, this.#name, first, last);
+    async backup(archive, first, last = '') {
+        await ZfsUtilities.sendAndReceiveZfsFilesystem(archive, this.#name, first, last);
     }
 
     /**
      * Take the new snapshot on the filesystem.
      */
-    takeNewSnapshot() {
+    async takeNewSnapshot() {
         // take the new snapshot and get the snapshot list on the filesystem.
-        const snapshot = ZfsUtilities.takeSnapshot(this.#name);
+        const snapshot = await ZfsUtilities.takeSnapshot(this.#name);
         this.#newSnapshot = snapshot;
     }
 
     /**
-     * Get the snapshot list
-     * @return the list of the snapshots on this filesystem.
+     * Get the snapshot list.
+     * @return {Promise<SnapshotList>} the list of the snapshots on this filesystem.
      */
-     getSnapshots() {
-        const snapshots = ZfsUtilities.snapshotList(this.#name, this.#newSnapshot);
+     async getSnapshots() {
+        const snapshots = await ZfsUtilities.snapshotList(this.#name, this.#newSnapshot);
         const list = new SnapshotList(snapshots);
 
         return list;
@@ -149,9 +165,11 @@ export class ZfsFilesystem {
     /**
      * Diff a snapshot and the current.
      * @param {string} snapshot a snapshot on the ZFS filesystem.
+     * @returns {Promise<string>} a message of the difference.
      */
-     diff(snapshot) {
-        ZfsUtilities.diff(`${this.#name}@${snapshot}`, this.#name);
+     async diff(snapshot) {
+        const message = await ZfsUtilities.diff(`${this.#name}@${snapshot}`, this.#name);
+        return message;
      }
 
     get name () {

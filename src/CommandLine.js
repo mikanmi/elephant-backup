@@ -27,7 +27,7 @@ export class CommandLine {
     #options = 
             {archive: 'unexpected', dryRun: false, verbose: false};
 
-    static getCommandLine() {
+    static getInstance() {
         return this.#thisInstance;
     }
 
