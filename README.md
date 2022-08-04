@@ -12,7 +12,7 @@ Elephant Backup archives any number of ZFS filesystems containing lots of snapsh
 
 ## Official Website
 
-Release Site: <https://github.com/patineboot/elephant-backup>
+Release Site: <https://www.npmjs.com/package/elephant-backup>
 
 Development Site: <https://github.com/patineboot/elephant-backup>
 
