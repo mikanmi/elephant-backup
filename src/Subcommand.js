@@ -148,7 +148,7 @@ class DiffSubcommand extends Subcommand{
         const archiveParentFilesystem = new ZfsFilesystem(archive);
 
         // print the name of the primary and archive ZFS filesystems.
-        const archiveFilesystem = archiveParentFilesystem.open('primaryFilesystem.name');
+        const archiveFilesystem = archiveParentFilesystem.open(primaryFilesystem.name);
         logger.print(`diff ${primaryFilesystem.name} and ${archiveFilesystem.name} `);
 
         let message = '';
