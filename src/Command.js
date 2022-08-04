@@ -113,17 +113,17 @@ export class Command {
         let stdout = '';
 
         const promise = new Promise((resolve, _) => {
-            child.stdout?.on('data', (data) => {
-                const dataString = data.toString().trimEnd();
-                // skip buffering stdout if piped stdout to the child's stdin
-                if (!this.#nextCommand) {
+            // skip this stdout handler if piped stdout to the child's stdin
+            if (!this.#nextCommand) {
+                child.stdout?.on('data', (data) => {
+                    const dataString = data.toString().trimEnd();
                     stdout += dataString;
-                }
-                if (this.printStdoutImmediately) {
-                    // print the child's stdout immediately on the application stdout.
-                    logger.print(`\n${dataString}`);
-                }
-            });
+                    if (this.printStdoutImmediately) {
+                        // print the child's stdout immediately on the application stdout.
+                        logger.print(`\n${dataString}`);
+                    }
+                });
+            }
             child.stderr?.on('data', (data) => {
                 // print stderr using the logger if printStderr is 'logger'.
                 if (this.printStderr == 'logger') {

@@ -44,7 +44,7 @@ class ZfsCommands {
     /**
      * @types {string} The command line that receives a ZFS filesystem.
      */
-    static ZFS_RECV_INCREMENTAL = 'zfs recv -F -d'
+    static ZFS_RECV_INCREMENTAL = 'zfs recv -F -d -x mountpoint'
 
     /**
      * @types {string} The command line that diffs a snapshot and current on the a filesystem.

@@ -33,5 +33,6 @@ echo '\n'
 
 echo 'export the archive filesystem.'
 echo '====================>'
+zfs unmount ${ARCHIVE}
 zpool export ${ARCHIVE}
 echo '\n'

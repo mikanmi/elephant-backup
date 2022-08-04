@@ -147,6 +147,10 @@ class DiffSubcommand extends Subcommand{
         // Make a ZFS instance from the same name as the primary on the archive ZFS filesystem.
         const archiveParentFilesystem = new ZfsFilesystem(archive);
 
+        // print the name of the primary and archive ZFS filesystems.
+        const archiveFilesystem = archiveParentFilesystem.open('primaryFilesystem.name');
+        logger.print(`diff ${primaryFilesystem.name} and ${archiveFilesystem.name} `);
+
         let message = '';
         // Get all of the ZFS datasets contained in the primary ZFS filesystem.
         const primaryDatasetFilesystems = await primaryFilesystem.openRecursively();
@@ -161,8 +165,10 @@ class DiffSubcommand extends Subcommand{
 
             message += await primaryDatasetFilesystem.diff(latestOfCommonSnapshots);
         }
+
+        // print no difference of the primary and the archive if no differences.
         if (message == '') {
-            logger.print(`${primaryFilesystem.name} and ${archiveParentFilesystem.name} are no differences`);
+            logger.print(`${primaryFilesystem.name} and ${archiveFilesystem.name} are no differences`);
         }
     }
 }
