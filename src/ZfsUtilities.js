@@ -132,11 +132,12 @@ export class ZfsUtilities {
         const estimateCommandLine = 
                 `${ZfsCommands.ZFS_SEND_RAW} ${estimateOption} ${firstSnapshot} ${lastSnapshot}`;
         const estimateCommand = new Command(estimateCommandLine);
+        estimateCommand.printStderr = 'ignore';
         const stdout = await estimateCommand.spawnIfNoDryRunAsync();
 
         // stdout involves the total size line like 'total estimated size is 1.22K.'
         const words = stdout.split(' ');
-        const size = words[words.length- 1 ];
+        const size = words[words.length - 1];
 
         return size;
     }
@@ -163,10 +164,11 @@ export class ZfsUtilities {
         const sendCommandLine = 
                 `${ZfsCommands.ZFS_SEND_RAW} ${dryRun} ${verbose} ${intermediate} ${firstSnapshot} ${lastSnapshot}`;
         const sendCommand = new Command(sendCommandLine);
+        sendCommand.printStderr = 'ignore';
 
         // the PV command to show a progress of transportation.
         const pvCommand = new Command(ZfsCommands.PV);
-        pvCommand.printStderrDirect = true;
+        pvCommand.printStderr = 'direct';
         sendCommand.add(pvCommand);
 
         // Building the receive command of the snapshots.

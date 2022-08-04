@@ -147,6 +147,7 @@ class DiffSubcommand extends Subcommand{
         // Make a ZFS instance from the same name as the primary on the archive ZFS filesystem.
         const archiveParentFilesystem = new ZfsFilesystem(archive);
 
+        let message = '';
         // Get all of the ZFS datasets contained in the primary ZFS filesystem.
         const primaryDatasetFilesystems = await primaryFilesystem.openRecursively();
         for (const primaryDatasetFilesystem of primaryDatasetFilesystems) {
@@ -158,12 +159,10 @@ class DiffSubcommand extends Subcommand{
             // Find the latest of common snapshots between the primary and the archive.
             const latestOfCommonSnapshots = primarySnapshots.findLatest(archiveSnapshots) || 'Unexpected Snapshot';
 
-            let message = await primaryDatasetFilesystem.diff(latestOfCommonSnapshots);
-            if (message == '') {
-                logger.print(`${primaryDatasetFilesystem.name} and ${archiveDatasetFilesystem.name} are no differences`);
-            }
+            message += await primaryDatasetFilesystem.diff(latestOfCommonSnapshots);
+        }
+        if (message == '') {
+            logger.print(`${primaryFilesystem.name} and ${archiveParentFilesystem.name} are no differences`);
         }
     }
 }
-
-

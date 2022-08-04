@@ -16,6 +16,24 @@ Release Site: <https://github.com/patineboot/elephant-backup>
 
 Development Site: <https://github.com/patineboot/elephant-backup>
 
+## Nodejs
+
+Install node.js on Ubuntu Linux.
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+Uninstall node.js on Ubuntu Linux.
+
+```bash
+sudo apt-get purge nodejs
+sudo rm -r /etc/apt/sources.list.d/nodesource.list
+```
+
+See [Installing Node.js via package manager](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions) on other platforms.
+
 ## Install
 
 1. Install Elephant Backup
@@ -82,8 +100,8 @@ elephant-backup diff -h
 
 ## Environment
 
-Patineboot confirmed Elephant Backup on the following software environment.  
-Elephant Backup is designed to run with other versions, involving earlier versions.
+Patineboot confirmed Elephant Backup on the following software environment.
+Elephant Backup is designed to run with the later or earlier versions.
 
 Operating System:
 
@@ -103,14 +121,25 @@ Patineboot continues to develop Elephant Backup.
 
 Move the current directory and do below.
 
-1. Install the development version from GitHub.
+1. Install
 
-   ```bash
-   npm install patineboot/elephant-backup
-   ```
+   - Install the development version from a local directory.
+
+      ```bash
+      cd elephant-backup
+      npm install ../elephant-backup
+      ```
+
+   - Install the development version from GitHub.
+
+      ```bash
+      npm install patineboot/elephant-backup
+      ```
 
 1. Run the development version.
 
    ```bash
    npm start
    ```
+
+Login again if install the node.js binary application with the _--global_ option.

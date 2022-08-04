@@ -9,6 +9,12 @@ echo '====================>'
 zpool import ${ARCHIVE}
 echo '\n'
 
+echo 'Mount the archive filesystem.'
+echo '====================>'
+zfs load-key -a
+zfs mount -a
+echo '\n'
+
 echo 'Show the changes files.'
 echo '====================>'
 elephant-backup diff -a ${ARCHIVE} ${PRIMARY}

@@ -26,10 +26,10 @@ export class Command {
     #nextCommand = null;
 
     /**
-     * Print the standard error on the standard error of the application.
-     * @type {boolean}
+     * Print the stderr to Logger or the application stderr, or mute the stderr.
+     * @type {'logger'|'direct'|'ignore'}
      */
-    printStderrDirect = false;
+    printStderr = 'logger'
 
     /**
      * Print the standard out immediately.
@@ -71,9 +71,19 @@ export class Command {
         const cmd = tokens[0];
         tokens.splice(0, 1);
 
-        const child = this.printStderrDirect ?
-                child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', process.stderr]}) :
-                child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'pipe']});
+        let child; 
+        switch (this.printStderr) {
+        case 'logger':
+            child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'pipe']});
+            break;
+        case 'direct':
+            child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', process.stderr]});
+            break;
+        case 'ignore':
+        default:
+            child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'ignore']});
+            break;
+        }
 
         const promises = [];
 
@@ -105,17 +115,22 @@ export class Command {
         const promise = new Promise((resolve, _) => {
             child.stdout?.on('data', (data) => {
                 const dataString = data.toString().trimEnd();
-                stdout += dataString;
+                // skip buffering stdout if piped stdout to the child's stdin
+                if (!this.#nextCommand) {
+                    stdout += dataString;
+                }
                 if (this.printStdoutImmediately) {
                     // print the child's stdout immediately on the application stdout.
                     logger.print(`\n${dataString}`);
                 }
             });
-            // stderr is undefined if printStderrDirect is true.
             child.stderr?.on('data', (data) => {
-                const dataString = data.toString().trimEnd();
-                // print the child's stderr immediately on the application stdout.
-                logger.error(`${dataString}`);
+                // print stderr using the logger if printStderr is 'logger'.
+                if (this.printStderr == 'logger') {
+                    const dataString = data.toString().trimEnd();
+                    // print the child's stderr immediately on the application stdout.
+                    logger.error(`${dataString}`);
+                }
             });
 
             child.on('spawn', () => {
