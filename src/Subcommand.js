@@ -9,7 +9,6 @@
 import { CommandLine, CommandType } from './CommandLine.js';
 import { Logger } from './Logger.js';
 import { ZfsFilesystem } from './ZfsFilesystem.js';
-import { ZfsUtilities } from './ZfsUtilities.js';
 
 const logger = Logger.getLogger()
 
@@ -25,6 +24,9 @@ export class Subcommand {
         switch (type) {
         case CommandType.BACKUP:
             subcommand = new BackupSubcommand();
+            break;
+        case CommandType.SNAPSHOT:
+            subcommand = new SnapshotSubcommand();
             break;
         case CommandType.DIFF:
         default: // fail safe
@@ -52,9 +54,6 @@ class BackupSubcommand extends Subcommand {
         const commandLine = CommandLine.getInstance();
         const targets = commandLine.targets;
         const options = commandLine.options;
-
-        // disable auto-snapshot property.
-        ZfsUtilities.disableAutoSnapshotProperty(options.archive);
 
         // start backup process.
         for (const target of targets) {
@@ -117,7 +116,7 @@ class BackupSubcommand extends Subcommand {
     }
 }
 
-class DiffSubcommand extends Subcommand{
+class DiffSubcommand extends Subcommand {
     /**
      * Run the 'diff' subcommand.
      */
@@ -128,7 +127,7 @@ class DiffSubcommand extends Subcommand{
         const targets = commandLine.targets;
         const options = commandLine.options;
 
-        // start differ process.
+        // start diff process.
         for (const target of targets) {
             await this.#diff(target, options.archive);
         }
@@ -170,5 +169,39 @@ class DiffSubcommand extends Subcommand{
         if (message == '') {
             logger.print(`${primaryFilesystem.name} and ${archiveFilesystem.name} are no differences`);
         }
+    }
+}
+
+class SnapshotSubcommand extends Subcommand {
+    /**
+     * Run the 'snapshot' subcommand.
+     */
+    async run() {
+        logger.debug(`Run 'snapshot' subcommand`);
+        const commandLine = CommandLine.getInstance();
+
+        const targets = commandLine.targets;
+
+        // start diff process.
+        for (const target of targets) {
+            await this.#takeSnapshot(target);
+        }
+    }
+
+    /**
+     * diff the primary ZFS filesystem and the archive ZFS filesystem.
+     * @param {string} filesystem a ZFS filesystem to backup.
+     */
+    async #takeSnapshot(filesystem) {
+        logger.info(`Start to snapshot: on [${filesystem}]`);
+
+        // New the ZFS instance from a ZFS filesystem.
+        const zfsFilesystem = new ZfsFilesystem(filesystem);
+
+        // take a new snapshot.
+        await zfsFilesystem.takeNewSnapshot();
+
+        // purge some of oldest snapshots.
+        await zfsFilesystem.purgeSnapshots();
     }
 }

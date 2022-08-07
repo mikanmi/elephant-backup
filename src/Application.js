@@ -13,19 +13,18 @@ import { Logger, LogLevel } from './Logger.js';
 import { CommandLine } from './CommandLine.js';
 import { Subcommand } from './Subcommand.js';
 import { ZfsUtilities } from './ZfsUtilities.js';
+import { Configure } from './Configure.js';
  
  const logger = Logger.getLogger();
  
 export class Application {
-
-    static LOG_FILEPATH = `${process.cwd()}/elephant-backup.log`;
 
     constructor() {
         const commandLine = CommandLine.getInstance();
         commandLine.configure();
         commandLine.parse();
 
-        const logFile = fs.createWriteStream(Application.LOG_FILEPATH);
+        const logFile = fs.createWriteStream(Configure.LOG_FILE_PATH);
         logger.addConsole(logFile);
     }
 

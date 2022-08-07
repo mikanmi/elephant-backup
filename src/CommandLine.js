@@ -13,6 +13,7 @@ import packageJson from '../package.json' assert {type: 'json'};
 export class CommandType {
     static BACKUP = 'backup';
     static DIFF = 'diff';
+    static SNAPSHOT = 'snapshot';
 }
 
 export class CommandLine {
@@ -44,6 +45,7 @@ export class CommandLine {
 
         this.#configureCommand(CommandType.BACKUP);
         this.#configureCommand(CommandType.DIFF);
+        this.#configureCommand(CommandType.SNAPSHOT);
     }
 
     /**
@@ -90,19 +92,24 @@ export class CommandLine {
         switch(commandType) {
         case CommandType.BACKUP:
             subcommand
-            .description('Back up any ZFS filesystems to another ZFS filesystems.');
-            break;
+            .description('Back up any ZFS filesystems to another ZFS filesystems.')
+            .requiredOption('-a, --archive <ZFS dataset>',
+            'ZFS dataset to store any original ZFS pools.');
+        break;
         case CommandType.DIFF:
             subcommand
-            .description('Show the changes of the previous backup and current primary filesystems.');
+            .description('Show the differences between the current of the primary filesystems and the latest backup.')
+            .requiredOption('-a, --archive <ZFS dataset>',
+            'ZFS dataset to store any original ZFS pools.');
             break;
+        case CommandType.SNAPSHOT:
+            subcommand
+            .description('Take a snapshot and purge some existing snapshots on a filesystem.');
         }
 
         subcommand
         .argument('<ZFS pools...>',
                 'the names of one or more original ZFS pools.')
-        .requiredOption('-a, --archive <ZFS dataset>',
-                'ZFS dataset to store any original ZFS pools.')
         .option('-v, --verbose',
                 'run with the verbose mode.',
                 false)

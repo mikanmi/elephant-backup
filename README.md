@@ -44,16 +44,15 @@ See [Installing Node.js via package manager](https://nodejs.org/en/download/pack
 
 1. Install Dependent Commands
 
-   Elephant Backup depends on the 'Pipe Viewer' and 'zfs-auto-snapshot' commands.  
+   Elephant Backup depends on the 'Pipe Viewer' command.  
    e.g., Install them on Ubuntu Linux.
 
    ```bash
-   apt install pv zfs-auto-snapshot
+   apt install pv
    ```
 
    The websites of the dependent commands:
    - Pipe Viewer: <https://www.ivarch.com/programs/pv.shtml>
-   - zfs-auto-snapshot: <https://github.com/zfsonlinux/zfs-auto-snapshot>
 
 ## Usage
 
@@ -111,11 +110,27 @@ Software Programs:
 
 - node.js v18.6.0
 - pv 1.6.6
-- zfs-auto-snapshot 1.2.4
 
 ## Developer of Elephant Backup
 
 Patineboot continues to develop Elephant Backup.
+
+Patineboot will create the new feature:
+
+- purging some existing snapshots from remaining size.
+
+```bash
+$ zfs list -o space -r rpool
+NAME                       AVAIL   USED  USEDSNAP  USEDDS  USEDREFRESERV  USEDCHILD
+rpool                      59.1G  7.84G       21K    109K              0      7.84G
+rpool@snap1                    -    21K         -       -              -          -
+rpool/ROOT                 59.1G  4.78G         0     31K              0      4.78G
+rpool/ROOT@snap1               -      0         -       -              -          -
+```
+
+The _USED_ property of snapshots is the size which snapshot consume.
+
+We estimate the volume size of the ZFS pool from the _USED_ property of to be purged snapshot.
 
 ### Development version
 

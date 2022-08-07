@@ -8,6 +8,7 @@
 
 import { Command } from './Command.js'
 import { CommandLine } from './CommandLine.js';
+import { Configure } from './Configure.js';
 import { Logger } from './Logger.js';
 
 const logger = Logger.getLogger();
@@ -52,14 +53,14 @@ class ZfsCommands {
     static ZFS_DIFF = 'zfs diff'
 
     /**
-     * @types {string} Set disable auto-snapshot which you take with zfs-auto-snapshot.
+     * @types {string} The command line that diffs a snapshot and current on the a filesystem.
      */
-    static ZFS_SET_AUTO_SNAPSHOT_FALSE = 'zfs set com.sun:auto-snapshot=false'
+    static ZFS_SNAPSHOT_RECURSIVE = 'zfs snapshot -r'
 
     /**
-     * @types {string} The command line that takes a snapshot with zfs-auto-snapshot.
+     * @types {string} The command line that diffs a snapshot and current on the a filesystem.
      */
-    static ZFS_TAKE_SNAPSHOT = 'zfs-auto-snapshot -qr --label=hourly'
+    static ZFS_DESTROY_RECURSIVE = 'zfs destroy -r'
 
     /**
      * @types {string} The command that show the progress of transporting backup on the standard error.
@@ -68,38 +69,65 @@ class ZfsCommands {
 }
 
 export class ZfsUtilities {
+
     /**
-     * Disable the com.sun:auto-snapshot property on a ZFS filesystem.
-     * @param {string} filesystem a ZFS filesystem.
+     * @type {string} The time used in taking a snapshot.
      */
-    static async disableAutoSnapshotProperty(filesystem) {
-        const zfsCommand = `${ZfsCommands.ZFS_SET_AUTO_SNAPSHOT_FALSE} ${filesystem}`;
-        const command = new Command(zfsCommand);
-        command.printStdoutImmediately = true;
-        await command.spawnIfNoDryRunAsync();
+    static #now = ZfsUtilities.#getNowDate();
+
+    static #getNowDate() {
+        // Get the current time in ISO format.
+        const date = new Date();
+        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+        const day = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+        const time = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
+        const dateLocal = `${day}-${time}`;
+
+        return dateLocal;
     }
 
     /**
-     * Take a snapshot on the filesystem.
+     * Parse a date string.
+     * @param {string} date a date string used on snapshot.
+     * @returns {Date} a Date instance made from the date string.
+     */
+     static parseDate(date) {
+        const dateElements = date.split('-');
+        const dateNumbers = dateElements.map(e => Number(e));
+        const dateInstance = new Date(Date.UTC(dateNumbers[0], dateNumbers[1], dateNumbers[2],
+                dateNumbers[3], dateNumbers[4], dateNumbers[5]));
+        return dateInstance;
+    }
+
+    /**
+     * Take a snapshot on the ZFS filesystem.
      * @param {string} filesystem a ZFS filesystem.
      * @return {Promise<string>} the new snapshot.
      */
-    static async takeSnapshot(filesystem) {
-        const commandLine = CommandLine.getInstance();
+     static async takeSnapshot(filesystem) {
+        const snapshotTag = `${Configure.PREFIX_SNAPSHOT}-${ZfsUtilities.#now}`;
 
-        const dryRun = commandLine.options.dryRun ? '-n' : '';
-        const zfsCommand = `${ZfsCommands.ZFS_TAKE_SNAPSHOT} ${dryRun} ${filesystem}`;
+        const snapshotName = `${filesystem}@${snapshotTag}`
 
+        const zfsCommand = `${ZfsCommands.ZFS_SNAPSHOT_RECURSIVE} ${snapshotName}`;
         const command = new Command(zfsCommand);
-        const stdout  = await command.spawnAsync();
+        await command.spawnIfNoDryRunAsync();
 
-        // 'stdout' includes the following:
-        // zfs snapshot -o com.sun:auto-snapshot-desc='-'  'pool1@zfs-auto-snap_hourly-2021-12-11-0557'
-        const element = stdout.split(`'`);
-        const snapshot = element[3];
+        logger.info(`Taken the new snapshot: ${snapshotTag}`);
+        return snapshotTag;
+    }
 
-        logger.info(`Taken the new snapshot: ${snapshot}`);
-        return snapshot;
+    /**
+     * Destroy a snapshot on the ZFS filesystem.
+     * @param {string} snapshot a snapshot.
+     * @param {string} filesystem a ZFS filesystem.
+     */
+     static async destroySnapshot(snapshot, filesystem) {
+        const zfsCommand = `${ZfsCommands.ZFS_DESTROY_RECURSIVE} ${filesystem}@${snapshot}`;
+        const command = new Command(zfsCommand);
+        await command.spawnIfNoDryRunAsync();
+
+        logger.info(`Purged the snapshot: ${snapshot}`);
     }
 
     /**

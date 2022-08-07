@@ -6,6 +6,7 @@
  */
 'use strict'
 
+import { Configure } from "./Configure.js";
 import { Logger } from "./Logger.js";
 import { ZfsUtilities } from "./ZfsUtilities.js";
 
@@ -73,6 +74,14 @@ export class SnapshotList {
         logger.debug(result);
         return result;
      }
+
+    /**
+     * Get the array of snapshots on this instance.
+     * @returns {string[]} the array of snapshots.
+     */
+    getSnapshots() {
+        return this.#snapshots;
+    }
 
 }
 
@@ -143,12 +152,65 @@ export class ZfsFilesystem {
     }
 
     /**
-     * Take the new snapshot on the filesystem.
+     * Take the new snapshot on the ZFS filesystem.
      */
     async takeNewSnapshot() {
         // take the new snapshot and get the snapshot list on the filesystem.
         const snapshot = await ZfsUtilities.takeSnapshot(this.#name);
         this.#newSnapshot = snapshot;
+    }
+
+    /**
+     * Purge snapshots on the ZFS filesystem.
+     */
+     async purgeSnapshots() {
+        const now = new Date();
+
+        const list = await this.getSnapshots();
+        const snapshots = list.getSnapshots();
+        {
+            // purge some snapshots of the keeping week area.
+            const baseTime = new Date(now);
+            const breakTime = new Date(now);
+            // the base time is (Configure.SNAPSHOT_KEEP_WEEKS * 7) days.
+            baseTime.setDate(baseTime.getDate() - Configure.SNAPSHOT_KEEP_WEEKS * 7);
+            // the break time is the border of the keeping days time.
+            breakTime.setDate(breakTime.getDate() - Configure.SNAPSHOT_KEEP_DAYS);
+            await this.#destroySnapshot(snapshots, baseTime, breakTime, 7)
+        }
+        {
+            // purge some snapshots of the keeping day area.
+            const baseTime = new Date(now);
+            const breakTime = new Date(now);
+            // the base time is Configure.SNAPSHOT_KEEP_DAYS days.
+            baseTime.setDate(baseTime.getDate() - Configure.SNAPSHOT_KEEP_DAYS);
+            // the break time is the border of the keeping hours time.
+            breakTime.setDate(breakTime.getDate() - Configure.SNAPSHOT_KEEP_HOURS / 24);
+            await this.#destroySnapshot(snapshots, baseTime, breakTime, 1)
+        }
+    }
+
+    /**
+     * Destroy a snapshot on the ZFS filesystem.
+     * @param {string[]} snapshots a array of snapshots.
+     * @param {Date} baseTime the base date.
+     * @param {Date} breakTime the break date.
+     * @param {number} offset a date offset to decrease the base date.
+     */
+    async #destroySnapshot(snapshots, baseTime, breakTime, offset) {
+        for (const snapshot of snapshots) {
+            const dateString = snapshot.slice(Configure.PREFIX_SNAPSHOT.length + 1);
+            const snapshotTime = ZfsUtilities.parseDate(dateString);
+            if (snapshotTime > baseTime) {
+                await ZfsUtilities.destroySnapshot(snapshot, this.#name);
+                continue;
+            }
+            baseTime = snapshotTime;
+            baseTime.setDate(baseTime.getDate()- offset);
+            if (breakTime > baseTime) {
+                break;
+            }
+        }
     }
 
     /**
