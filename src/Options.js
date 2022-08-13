@@ -9,16 +9,18 @@
 import { Command } from 'commander';
 
 import packageJson from '../package.json' assert {type: 'json'};
+import { Configure } from './Configure.js';
 
 export class CommandType {
     static BACKUP = 'backup';
     static DIFF = 'diff';
     static SNAPSHOT = 'snapshot';
+    static SYSTEMD = 'systemd';
 }
 
-export class CommandLine {
+export class Options {
 
-    static #thisInstance = new CommandLine();
+    static #thisInstance = new Options();
 
     #program = new Command();
 
@@ -105,20 +107,44 @@ export class CommandLine {
         case CommandType.SNAPSHOT:
             subcommand
             .description('Take a snapshot and purge some existing snapshots on a filesystem.');
+            break;
+        case CommandType.SYSTEMD:
+            subcommand
+            .description('Enable to take a snapshot automatically or disable it.');
+            break;
+        }
+
+        switch(commandType) {
+        case CommandType.BACKUP:
+        case CommandType.DIFF:
+        case CommandType.SNAPSHOT:
+            subcommand
+            .argument('<ZFS pools...>',
+                    'the names of one or more original ZFS pools.')
+            .action((pools, _, command) => {
+                this.#subCommand = command;
+                this.#targets = pools;
+            });
+            break;   
+        case CommandType.SYSTEMD:
+            const enable = Configure.SYSTEMD_BEHAVIOR_ENABLE;
+            const disable = Configure.SYSTEMD_BEHAVIOR_DISABLE;
+
+            subcommand
+            .argument('<behavior>',
+                    `'${enable}': Install and enable auto snapshot with systemd, '${disable}': uninstall.`)
+            .action((behavior, _, command) => {
+                this.#subCommand = command;
+                this.#targets = behavior;
+            });
         }
 
         subcommand
-        .argument('<ZFS pools...>',
-                'the names of one or more original ZFS pools.')
         .option('-v, --verbose',
                 'run with the verbose mode.',
                 false)
         .option('-n, --dry-run',
                 'run with no change made.',
-                false)
-        .action((pools, _, command) => {
-            this.#subCommand = command;
-            this.#targets = pools;
-        });
+                false);
     }
 }

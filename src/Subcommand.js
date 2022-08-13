@@ -6,9 +6,11 @@
  */
 'use strict'
 
-import { CommandLine, CommandType } from './CommandLine.js';
+import { Options, CommandType } from './Options.js';
 import { Logger } from './Logger.js';
 import { ZfsFilesystem } from './ZfsFilesystem.js';
+import { ZfsUtilities } from './ZfsUtilities.js';
+import { Configure } from './Configure.js';
 
 const logger = Logger.getLogger()
 
@@ -23,17 +25,31 @@ export class Subcommand {
         let subcommand;
         switch (type) {
         case CommandType.BACKUP:
-            subcommand = new BackupSubcommand();
+            subcommand = new BackupSubcommand(type);
             break;
         case CommandType.SNAPSHOT:
-            subcommand = new SnapshotSubcommand();
+            subcommand = new SnapshotSubcommand(type);
+            break;
+        case CommandType.SYSTEMD:
+            subcommand = new SytemdSubcommand(type);
             break;
         case CommandType.DIFF:
         default: // fail safe
-            subcommand = new DiffSubcommand();
+            subcommand = new DiffSubcommand(type);
             break;
         }
         return subcommand;
+    }
+
+    commandType;
+
+    /**
+     * Create a Subcommand instance.
+     * @param {CommandType} type a Subcommand type.
+     * @return the Subcommand instance created with the subcommand type.
+     */
+    constructor(type) {
+        this.commandType = type;
     }
 
     /**
@@ -41,9 +57,49 @@ export class Subcommand {
      */
     async run() {
     }
+
+    /**
+     * The ZFS filesystems of the command options are accessible or exit.
+     * @returns true if accessible, otherwise exit.
+     */
+    async accessibleFilesystems() {
+        return false;
+    }
+
+    async checkCondition() {
+        const options = Options.getInstance();
+
+        if (!options.options.dryRun && !ZfsUtilities.isSuperUser()) {
+            // run the diff Subcommand of Elephant Backup on a normal user.
+            logger.exit(`Run the ${options.subcommand} on the SUPER user.`);
+        }
+        await this.accessibleFilesystems();
+    }
 }
 
 class BackupSubcommand extends Subcommand {
+    /**
+     * The ZFS filesystems of the command options are accessible or exit.
+     * @returns true if accessible, otherwise exit.
+     */
+    async accessibleFilesystems() {
+        const list = await ZfsUtilities.filesystemList();
+
+        const options = Options.getInstance();
+        const archive = options.options.archive;
+        const targets = options.targets;
+
+        // exit if the ZFS filesystems, which a user specifies, do not exist on the machine.
+        if (!list.includes(archive)) {
+            logger.exit(`An archive ZFS pool/dataset is not exist: ${archive}`);
+        }
+        targets.forEach((target) => {
+            if (!list.includes(target)) {
+                logger.exit(`A primary ZFS pool/dataset is not exist: ${target}`);
+            }
+        });
+        return true;
+    }
 
     /**
      * Run the 'backup' subcommand.
@@ -51,13 +107,15 @@ class BackupSubcommand extends Subcommand {
     async run() {
         logger.debug(`run 'backup' subcommand`);
 
-        const commandLine = CommandLine.getInstance();
+        await this.checkCondition();
+
+        const commandLine = Options.getInstance();
         const targets = commandLine.targets;
-        const options = commandLine.options;
+        const archive = commandLine.options.archive;
 
         // start backup process.
         for (const target of targets) {
-            await this.#backup(target, options.archive);
+            await this.#backup(target, archive);
         }
     }
 
@@ -118,18 +176,43 @@ class BackupSubcommand extends Subcommand {
 
 class DiffSubcommand extends Subcommand {
     /**
+     * The ZFS filesystems of the command options are accessible or exit.
+     * @returns true if accessible, otherwise exit.
+     */
+     async accessibleFilesystems() {
+        const list = await ZfsUtilities.filesystemList();
+
+        const options = Options.getInstance();
+        const archive = options.options.archive;
+        const targets = options.targets;
+
+        // exit if the ZFS filesystems, which a user specifies, do not exist on the machine.
+        if (!list.includes(archive)) {
+            logger.exit(`An archive ZFS pool/dataset is not exist: ${archive}`);
+        }
+        targets.forEach((target) => {
+            if (!list.includes(target)) {
+                logger.exit(`The primary ZFS pool/dataset is not exist: ${target}`);
+            }
+        });
+        return true;
+    }
+
+    /**
      * Run the 'diff' subcommand.
      */
     async run() {
         logger.debug(`Run 'diff' subcommand`);
-        const commandLine = CommandLine.getInstance();
+        const commandLine = Options.getInstance();
+
+        await this.checkCondition();
 
         const targets = commandLine.targets;
-        const options = commandLine.options;
+        const archive = commandLine.options.archive;
 
         // start diff process.
         for (const target of targets) {
-            await this.#diff(target, options.archive);
+            await this.#diff(target, archive);
         }
     }
 
@@ -174,12 +257,33 @@ class DiffSubcommand extends Subcommand {
 
 class SnapshotSubcommand extends Subcommand {
     /**
+     * The ZFS filesystems of the command options are accessible or exit.
+     * @returns true if accessible, otherwise exit.
+     */
+     async accessibleFilesystems() {
+        // exit if the ZFS filesystems, which a user specifies, do not exist on the machine.
+        const list = await ZfsUtilities.filesystemList();
+
+        const options = Options.getInstance();
+        const targets = options.targets;
+
+        targets.forEach((target) => {
+            if (!list.includes(target)) {
+                logger.exit(`A ZFS pool/dataset to taking a snapshot is not exist: ${target}`);
+            }
+        });
+        return true;
+    }
+
+    /**
      * Run the 'snapshot' subcommand.
      */
     async run() {
         logger.debug(`Run 'snapshot' subcommand`);
-        const commandLine = CommandLine.getInstance();
 
+        await this.checkCondition();
+
+        const commandLine = Options.getInstance();
         const targets = commandLine.targets;
 
         // start diff process.
@@ -203,5 +307,46 @@ class SnapshotSubcommand extends Subcommand {
 
         // purge some of oldest snapshots.
         await zfsFilesystem.purgeSnapshots();
+    }
+}
+
+class SytemdSubcommand extends Subcommand {
+    /**
+     * The ZFS filesystems of the command options are accessible or exit.
+     * @returns true if accessible, otherwise exit.
+     */
+     async accessibleFilesystems() {
+        // exit if an undefined behavior is specified.
+        const options = Options.getInstance();
+        const targets = options.targets;
+
+        if (targets.length != 1) {
+            logger.exit(`2 or more behaviors specified: ${targets}`);
+        }
+
+        const target = targets[0];
+        if (target != Configure.SYSTEMD_BEHAVIOR_ENABLE ||
+                target != Configure.SYSTEMD_BEHAVIOR_DISABLE) {
+            // undefined behavior.
+            logger.exit(`An undefined behavior is specified: ${target}`);
+        }
+        return true;
+    }
+
+    /**
+     * Run the 'systemd' subcommand.
+     */
+     async run() {
+        logger.debug(`Run 'systemd' subcommand`);
+
+        await this.checkCondition();
+
+        const commandLine = Options.getInstance();
+        const targets = commandLine.targets;
+
+        const target = targets[0];
+        const action = target == Configure.SYSTEMD_BEHAVIOR_ENABLE;
+
+        await ZfsUtilities.enableSystemd(action);
     }
 }

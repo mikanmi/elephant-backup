@@ -9,10 +9,9 @@
 import child_process from 'node:child_process';
 import stream from 'node:stream';
 import { Logger } from './Logger.js';
-import { CommandLine } from './CommandLine.js';
+import { Options } from './Options.js';
 
 const logger = Logger.getLogger();
-
 
 export class Command {
     /**
@@ -26,10 +25,9 @@ export class Command {
     #nextCommand = null;
 
     /**
-     * Print the stderr to Logger or the application stderr, or mute the stderr.
-     * @type {'logger'|'direct'|'ignore'}
+     * @type {((data: any) => void)|null}
      */
-    printStderr = 'logger'
+    #stderrHandler = null;
 
     /**
      * Print the standard out immediately.
@@ -43,6 +41,13 @@ export class Command {
      */
     constructor(commandWithArgs) {
         this.#commandWithArguments = commandWithArgs;
+
+        this.setStdErrHandler((data) => {
+            // print stderr using the logger if printStderr is 'logger'.
+            const dataString = data.toString().trimEnd();
+            // print the child's stderr immediately on the application stdout.
+            logger.error(`${dataString}`);
+        });
     }
 
     /**
@@ -51,7 +56,7 @@ export class Command {
      * @return {Promise<string>} The result of spawn the command line.
      */
      async spawnIfNoDryRunAsync(stdin = null) {
-        const commandLine = CommandLine.getInstance();
+        const commandLine = Options.getInstance();
 
         const result = commandLine.options.dryRun ?
              await this.#spawnDryRunAsync(stdin) :
@@ -71,19 +76,23 @@ export class Command {
         const cmd = tokens[0];
         tokens.splice(0, 1);
 
-        let child; 
-        switch (this.printStderr) {
-        case 'logger':
-            child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'pipe']});
-            break;
-        case 'direct':
-            child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', process.stderr]});
-            break;
-        case 'ignore':
-        default:
-            child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'ignore']});
-            break;
-        }
+        const child = this.#stderrHandler ?
+                child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'pipe']}) :
+                child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'ignore']});
+
+        // let child; 
+        // switch (this.printStderr) {
+        // case 'logger':
+        //     child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'pipe']});
+        //     break;
+        // case 'direct':
+        //     child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', process.stderr]});
+        //     break;
+        // case 'ignore':
+        // default:
+        //     child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'ignore']});
+        //     break;
+        // }
 
         const promises = [];
 
@@ -125,12 +134,7 @@ export class Command {
                 });
             }
             child.stderr?.on('data', (data) => {
-                // print stderr using the logger if printStderr is 'logger'.
-                if (this.printStderr == 'logger') {
-                    const dataString = data.toString().trimEnd();
-                    // print the child's stderr immediately on the application stdout.
-                    logger.error(`${dataString}`);
-                }
+                this.#stderrHandler?.call(this, data);
             });
 
             child.on('spawn', () => {
@@ -172,5 +176,13 @@ export class Command {
      */
     add(command) {
         this.#nextCommand = command;
+    }
+
+    /**
+     * Set a standard error handler to this instance.
+     * @param {((data: any) => void)|null} handler intercept and pass the data to the handler if a standard error occurred.
+     */
+     setStdErrHandler(handler) {
+        this.#stderrHandler = handler;
     }
 }

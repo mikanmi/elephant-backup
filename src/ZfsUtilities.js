@@ -7,7 +7,7 @@
 'use strict'
 
 import { Command } from './Command.js'
-import { CommandLine } from './CommandLine.js';
+import { Options } from './Options.js';
 import { Configure } from './Configure.js';
 import { Logger } from './Logger.js';
 
@@ -25,7 +25,7 @@ class ZfsCommands {
     /**
      * @types {string} The command line that shows ZFS filesystems *recursively* on this machine.
      */
-     static CMD_ZFS_LIST_FILESYSTEM_RECURSIVE = 'zfs list -H -r -o name -t filesystem';
+     static ZFS_LIST_FILESYSTEM_RECURSIVE = 'zfs list -H -r -o name -t filesystem';
 
     /**
      * @types {string} The command line that shows ZFS filesystems on this machine.
@@ -63,9 +63,10 @@ class ZfsCommands {
     static ZFS_DESTROY_RECURSIVE = 'zfs destroy -r'
 
     /**
-     * @types {string} The command that show the progress of transporting backup on the standard error.
+     * @types {string} The command line that enable-disable the Elephant Backup systemd unit.
      */
-    static PV = 'pv'
+     static SETUP_UNIT_SH = 'systemd/setup-unit.sh'
+
 }
 
 export class ZfsUtilities {
@@ -78,12 +79,17 @@ export class ZfsUtilities {
     static #getNowDate() {
         // Get the current time in ISO format.
         const date = new Date();
-        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-        const day = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-        const time = `${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}`;
-        const dateLocal = `${day}-${time}`;
+        // date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
 
-        return dateLocal;
+        const fy = date.getFullYear().toString().padStart(4, '0');
+        const mo = date.getMonth().toString().padStart(2,'0');
+        const d = date.getDate().toString().padStart(2,'0');
+        const h = date.getHours().toString().padStart(2,'0');
+        const mi = date.getMinutes().toString().padStart(2,'0');
+        const s = date.getSeconds().toString().padStart(2,'0');
+
+        const localDate = `${fy}-${mo}-${d}-${h}${mi}${s}`;
+        return localDate;
     }
 
     /**
@@ -93,6 +99,11 @@ export class ZfsUtilities {
      */
      static parseDate(date) {
         const dateElements = date.split('-');
+        const time = dateElements.pop() ?? 'unexpected time';
+        for (let index = 0; index < 3; index+=2) {
+            dateElements.push(time.slice(index, index + 2));
+        }
+
         const dateNumbers = dateElements.map(e => Number(e));
         const dateInstance = new Date(Date.UTC(dateNumbers[0], dateNumbers[1], dateNumbers[2],
                 dateNumbers[3], dateNumbers[4], dateNumbers[5]));
@@ -113,8 +124,8 @@ export class ZfsUtilities {
         const command = new Command(zfsCommand);
         await command.spawnIfNoDryRunAsync();
 
-        logger.info(`Taken the new snapshot: ${snapshotTag}`);
-        return snapshotTag;
+        logger.info(`Taken the new snapshot: ${snapshotName}`);
+        return snapshotName;
     }
 
     /**
@@ -160,7 +171,7 @@ export class ZfsUtilities {
         const estimateCommandLine = 
                 `${ZfsCommands.ZFS_SEND_RAW} ${estimateOption} ${firstSnapshot} ${lastSnapshot}`;
         const estimateCommand = new Command(estimateCommandLine);
-        estimateCommand.printStderr = 'ignore';
+        estimateCommand.setStdErrHandler(null);
         const stdout = await estimateCommand.spawnIfNoDryRunAsync();
 
         // stdout involves the total size line like 'total estimated size is 1.22K.'
@@ -180,7 +191,7 @@ export class ZfsUtilities {
     static async sendAndReceiveZfsFilesystem(archive, filesystem, first, last = '') {
         const intermediate = last == '' ? '' : '-I';
 
-        const commandLine = CommandLine.getInstance();
+        const commandLine = Options.getInstance();
         const dryRun = commandLine.options.dryRun ? '-n' : '';
         const verbose = commandLine.options.verbose ? '-v' : '';
 
@@ -189,22 +200,24 @@ export class ZfsUtilities {
 
         // Spawn the backup commands set after creating and building the three below commands.
         // Building the send command of the filesystem.
+        const stderrHandler = (/** @type {any} */ data) => {
+        //const stderrHandler = (/** @type {any} */ data) => {
+            const dataString = data.toString().trimEnd();
+            // print the child's stderr immediately on the application stdout.
+            logger.print(`${dataString}`);
+        };
+
         const sendCommandLine = 
                 `${ZfsCommands.ZFS_SEND_RAW} ${dryRun} ${verbose} ${intermediate} ${firstSnapshot} ${lastSnapshot}`;
         const sendCommand = new Command(sendCommandLine);
-        sendCommand.printStderr = 'ignore';
-
-        // the PV command to show a progress of transportation.
-        const pvCommand = new Command(ZfsCommands.PV);
-        pvCommand.printStderr = 'direct';
-        sendCommand.add(pvCommand);
+        sendCommand.setStdErrHandler(stderrHandler);
 
         // Building the receive command of the snapshots.
         const receiveCommandLine =
                 `${ZfsCommands.ZFS_RECV_INCREMENTAL} ${archive}`;
         const receiveCommand = new Command(receiveCommandLine);
         receiveCommand.printStdoutImmediately = true;
-        pvCommand.add(receiveCommand);
+        sendCommand.add(receiveCommand);
 
         await sendCommand.spawnIfNoDryRunAsync();
     }
@@ -245,7 +258,7 @@ export class ZfsUtilities {
      */
      static async filesystemListRecursively(filesystem) {
         const command =
-                new Command(`${ZfsCommands.CMD_ZFS_LIST_FILESYSTEM_RECURSIVE} ${filesystem}`);
+                new Command(`${ZfsCommands.ZFS_LIST_FILESYSTEM_RECURSIVE} ${filesystem}`);
         const result = await command.spawnAsync();
 
         const filesystems = result.split('\n');
@@ -268,10 +281,23 @@ export class ZfsUtilities {
         const snapshots = result.split('\n');
         if (snapshot) {
             snapshots.push(snapshot);
+            logger.debug(`Push the snapshot for DryRun option: ${snapshot}`);
         }
 
         logger.debug(`Snapshots on ${filesystem}: ${snapshots}`);
         return snapshots;
+    }
+
+    /**
+     * Install and enable systemd unit.
+     * @param {boolean} action install and enable if true, disable and uninstall if false.
+     */
+     static async enableSystemd(action) {
+        const option = action ? 'enable' : 'disable';
+
+        const zfsCommand = `${ZfsCommands.SETUP_UNIT_SH} ${option}`
+        const command = new Command(zfsCommand);
+        await command.spawnIfNoDryRunAsync();
     }
 
     /**
