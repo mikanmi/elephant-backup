@@ -1,5 +1,5 @@
 [Unit]
-Description=Elephant Backup take snapshots hourly.
+Description=Elephant Backup's auto snapshots.
 
 [Timer]
 OnCalendar=hourly

@@ -1,5 +1,7 @@
 [Unit]
+Description=Elephant Backup's auto snapshots.
 After=zfs.target
+
 [Service]
 Type=simple
-ExecStart=elephant-backup snapshot POOLS_REPLACEMENT
+ExecStart="elephant-backup snapshot POOLS_REPLACEMENT"

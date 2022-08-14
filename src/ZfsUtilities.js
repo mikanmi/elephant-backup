@@ -292,11 +292,12 @@ export class ZfsUtilities {
     /**
      * Install and enable systemd unit.
      * @param {boolean} action install and enable if true, disable and uninstall if false.
+     * @param {string[]} filesystems An array of ZFS filesystem to take snapshots automatically.
      */
-     static async enableSystemd(action) {
-        const option = action ? 'enable' : 'disable';
+     static async enableSystemd(action, filesystems) {
+        const option = action ? Configure.SYSTEMD_BEHAVIOR_ENABLE : Configure.SYSTEMD_BEHAVIOR_DISABLE;
 
-        const zfsCommand = `${ZfsCommands.SYSTEMD_UNIT_INSTALLER} ${option}`
+        const zfsCommand = `${ZfsCommands.SYSTEMD_UNIT_INSTALLER} ${option} ${filesystems}`
         const command = new Command(zfsCommand);
         command.printStdoutImmediately = true;
         await command.spawnIfNoDryRunAsync();

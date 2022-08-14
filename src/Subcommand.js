@@ -30,8 +30,9 @@ export class Subcommand {
         case CommandType.SNAPSHOT:
             subcommand = new SnapshotSubcommand(type);
             break;
-        case CommandType.SYSTEMD:
-            subcommand = new SytemdSubcommand(type);
+        case CommandType.SYSTEMD_INSTALL:
+        case CommandType.SYSTEMD_UNINSTALL:
+                subcommand = new SytemdSubcommand(type);
             break;
         case CommandType.DIFF:
         default: // fail safe
@@ -55,12 +56,14 @@ export class Subcommand {
     /**
      * Run the subcommand.
      */
+    // NOSNOAR
     async run() {
+        // nothing to do.
     }
 
     /**
      * The ZFS filesystems of the command options are accessible or exit.
-     * @returns true if accessible, otherwise exit.
+     * @returns true if accessible, otherwise false.
      */
     async accessibleFilesystems() {
         return false;
@@ -73,7 +76,11 @@ export class Subcommand {
             // run the diff Subcommand of Elephant Backup on a normal user.
             logger.exit(`Run the ${options.subcommand} on the SUPER user.`);
         }
-        await this.accessibleFilesystems();
+
+        const accessible = await this.accessibleFilesystems();
+        if (!accessible) {
+            logger.exit('Any ZFS filesystems are not accessible.');
+        }
     }
 }
 
@@ -91,13 +98,17 @@ class BackupSubcommand extends Subcommand {
 
         // exit if the ZFS filesystems, which a user specifies, do not exist on the machine.
         if (!list.includes(archive)) {
-            logger.exit(`An archive ZFS pool/dataset is not exist: ${archive}`);
+            logger.error(`An archive ZFS pool/dataset is not exist: ${archive}`);
+            return false;
         }
-        targets.forEach((target) => {
+
+        for (const target of targets) {
             if (!list.includes(target)) {
-                logger.exit(`A primary ZFS pool/dataset is not exist: ${target}`);
+                logger.error(`A primary ZFS pool/dataset is not exist: ${target}`);
+                return false;
             }
-        });
+        }
+
         return true;
     }
 
@@ -188,13 +199,17 @@ class DiffSubcommand extends Subcommand {
 
         // exit if the ZFS filesystems, which a user specifies, do not exist on the machine.
         if (!list.includes(archive)) {
-            logger.exit(`An archive ZFS pool/dataset is not exist: ${archive}`);
+            logger.error(`An archive ZFS pool/dataset is not exist: ${archive}`);
+            return false;
         }
-        targets.forEach((target) => {
+
+        for (const target of targets) {
             if (!list.includes(target)) {
-                logger.exit(`The primary ZFS pool/dataset is not exist: ${target}`);
+                logger.error(`The primary ZFS pool/dataset is not exist: ${target}`);
+                return false;
             }
-        });
+        }
+
         return true;
     }
 
@@ -267,11 +282,13 @@ class SnapshotSubcommand extends Subcommand {
         const options = Options.getInstance();
         const targets = options.targets;
 
-        targets.forEach((target) => {
+        for (const target of targets) {
             if (!list.includes(target)) {
-                logger.exit(`A ZFS pool/dataset to taking a snapshot is not exist: ${target}`);
+                logger.warn(`A ZFS pool/dataset to taking a snapshot is not exist: ${target}`);
+                logger.warn(`Skipping a snapshot on the ZFS pool/dataset: ${target}`);
             }
-        });
+        }
+
         return true;
     }
 
@@ -283,12 +300,16 @@ class SnapshotSubcommand extends Subcommand {
 
         await this.checkCondition();
 
-        const commandLine = Options.getInstance();
-        const targets = commandLine.targets;
+        const list = await ZfsUtilities.filesystemList();
+
+        const options = Options.getInstance();
+        const targets = options.targets;
 
         // start diff process.
         for (const target of targets) {
-            await this.#takeSnapshot(target);
+            if (list.includes(target)) {
+                await this.#takeSnapshot(target);
+            }
         }
     }
 
@@ -316,19 +337,27 @@ class SytemdSubcommand extends Subcommand {
      * @returns true if accessible, otherwise exit.
      */
      async accessibleFilesystems() {
-        // exit if an undefined behavior is specified.
+
+        switch (this.commandType) {
+        case CommandType.SYSTEMD_INSTALL:
+            // nothing to do.
+            break;
+        case CommandType.SYSTEMD_UNINSTALL:
+            // success always if command type is systemd uninstall.
+            return true;
+        }
+
+        // exit if the ZFS filesystems, which a user specifies, do not exist on the machine.
+        const list = await ZfsUtilities.filesystemList();
+
         const options = Options.getInstance();
         const targets = options.targets;
 
-        if (targets.length != 1) {
-            logger.exit(`2 or more behaviors specified: ${targets}`);
-        }
-
-        const target = targets[0];
-        if (target != Configure.SYSTEMD_BEHAVIOR_ENABLE &&
-                target != Configure.SYSTEMD_BEHAVIOR_DISABLE) {
-            // undefined behavior.
-            logger.exit(`An undefined behavior is specified: ${target}`);
+        for (const target of targets) {
+            if (!list.includes(target)) {
+                logger.error(`A ZFS pool/dataset to run auto-snapshot is not exist: ${target}`);
+                return false;
+            }
         }
         return true;
     }
@@ -341,12 +370,11 @@ class SytemdSubcommand extends Subcommand {
 
         await this.checkCondition();
 
-        const commandLine = Options.getInstance();
-        const targets = commandLine.targets;
+        const options = Options.getInstance();
+        const targets = options.targets;
 
-        const target = targets[0];
-        const action = target == Configure.SYSTEMD_BEHAVIOR_ENABLE;
+        const enable = this.commandType == CommandType.SYSTEMD_INSTALL;
 
-        await ZfsUtilities.enableSystemd(action);
+        await ZfsUtilities.enableSystemd(enable, targets);
     }
 }

@@ -9,13 +9,13 @@
 import { Command } from 'commander';
 
 import packageJson from '../package.json' assert {type: 'json'};
-import { Configure } from './Configure.js';
 
 export class CommandType {
     static BACKUP = 'backup';
     static DIFF = 'diff';
     static SNAPSHOT = 'snapshot';
-    static SYSTEMD = 'systemd';
+    static SYSTEMD_INSTALL = 'systemd-install';
+    static SYSTEMD_UNINSTALL = 'systemd-uninstall';
 }
 
 export class Options {
@@ -48,7 +48,8 @@ export class Options {
         this.#configureCommand(CommandType.BACKUP);
         this.#configureCommand(CommandType.DIFF);
         this.#configureCommand(CommandType.SNAPSHOT);
-        this.#configureCommand(CommandType.SYSTEMD);
+        this.#configureCommand(CommandType.SYSTEMD_INSTALL);
+        this.#configureCommand(CommandType.SYSTEMD_UNINSTALL);
     }
 
     /**
@@ -109,9 +110,13 @@ export class Options {
             subcommand
             .description('Take a snapshot and purge some existing snapshots on a filesystem.');
             break;
-        case CommandType.SYSTEMD:
+        case CommandType.SYSTEMD_INSTALL:
             subcommand
-            .description('Enable to take a snapshot automatically or disable it.');
+            .description('Enable to take a snapshot automatically.');
+            break;
+        case CommandType.SYSTEMD_UNINSTALL:
+            subcommand
+            .description('Disable to take a snapshot automatically.');
             break;
         }
 
@@ -119,25 +124,21 @@ export class Options {
         case CommandType.BACKUP:
         case CommandType.DIFF:
         case CommandType.SNAPSHOT:
-            subcommand
+        case CommandType.SYSTEMD_INSTALL:
+                subcommand
             .argument('<ZFS pools...>',
                     'the names of one or more original ZFS pools.')
             .action((pools, _, command) => {
                 this.#subCommand = command;
                 this.#targets = pools;
             });
-            break;   
-        case CommandType.SYSTEMD:
-            const enable = Configure.SYSTEMD_BEHAVIOR_ENABLE;
-            const disable = Configure.SYSTEMD_BEHAVIOR_DISABLE;
-
+            break;
+        case CommandType.SYSTEMD_UNINSTALL:
             subcommand
-            .argument('<behavior>',
-                    `'${enable}': Install and enable auto snapshot with systemd, '${disable}': uninstall.`)
-            .action((behavior, _, command) => {
+            .action((_, command) => {
                 this.#subCommand = command;
-                this.#targets = [behavior];
             });
+            break;
         }
 
         subcommand

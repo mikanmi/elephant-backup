@@ -1,9 +1,10 @@
-#!/usr/bin/env -S sh -eu
+#!/usr/bin/env -S bash -eu -x
 
 UNIT_NAME='elephant-backup-systemd'
 SYSTEMD_DIR='/etc/systemd/system/'
 
-SCRIPT_DIR=`realpath ./`
+SCRIPT_DIR=`realpath ./`"/systemd/"
+POOLS=${@:2:($#-1)}
 
 if [ $1 = 'enable' ]; then
     echo "Copy the service and timer unit files."
@@ -12,18 +13,18 @@ if [ $1 = 'enable' ]; then
 
     echo "Replacing POOLS_REPLACEMENT in the service unit file."
     # remove subcommand from the arguments of this command.
-    POOLS=`echo @* | tr -d 'enable'`
+    # POOLS=`echo @{*} | tr -d 'enable'`
     # replace POOLS_REPLACEMENT to the names of the actual ZFS pools. 
-    sed -i -e "s/POOLS_REPLACEMENT/${POOLS}/g" ${SYSTEMD_DIR}${UNIT_NAME}.service
+    sed -i -e "s/POOLS_REPLACEMENT/${POOLS#enable}/g" ${SYSTEMD_DIR}${UNIT_NAME}.service
 
     echo "Enable the Elephant Backup systemd unit."
-    systemd enable ${UNIT_NAME}
+    systemctl enable --now ${UNIT_NAME}.timer
     exit 0
 fi
 
 if [ $1 = 'disable' ]; then
     echo "Disable the Elephant Backup systemd unit."
-    systemd disable ${UNIT_NAME}
+    systemctl disable ${UNIT_NAME}.timer
     rm ${SYSTEMD_DIR}${UNIT_NAME}.service
     rm ${SYSTEMD_DIR}${UNIT_NAME}.timer
     exit 0
