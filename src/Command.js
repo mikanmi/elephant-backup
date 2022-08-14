@@ -7,7 +7,7 @@
 'use strict'
 
 import child_process from 'node:child_process';
-import stream from 'node:stream';
+import stream from 'node:stream'; // NOSONAR
 import { Logger } from './Logger.js';
 import { Options } from './Options.js';
 
@@ -79,20 +79,6 @@ export class Command {
         const child = this.#stderrHandler ?
                 child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'pipe']}) :
                 child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'ignore']});
-
-        // let child; 
-        // switch (this.printStderr) {
-        // case 'logger':
-        //     child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'pipe']});
-        //     break;
-        // case 'direct':
-        //     child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', process.stderr]});
-        //     break;
-        // case 'ignore':
-        // default:
-        //     child = child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'ignore']});
-        //     break;
-        // }
 
         const promises = [];
 

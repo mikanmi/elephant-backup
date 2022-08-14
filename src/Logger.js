@@ -7,7 +7,7 @@
 'use strict'
 
 import util from "node:util";
-import stream from "node:stream";
+import stream from "node:stream"; // NOSONAR
 import console from 'node:console';
 
 export class LogLevel{
@@ -43,6 +43,7 @@ export class Logger {
      * Constructor
      */
     constructor() {
+        // nothing to do.
     }
 
     /**

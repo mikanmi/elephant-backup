@@ -1,4 +1,4 @@
-#!/usr/bin/env -S bash -eu -x
+#!/usr/bin/env -S bash -eu
 
 UNIT_NAME='elephant-backup-systemd'
 SYSTEMD_DIR='/etc/systemd/system/'

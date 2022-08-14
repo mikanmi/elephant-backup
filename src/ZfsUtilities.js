@@ -67,7 +67,7 @@ class ZfsCommands {
     /**
      * @types {string} The command line that enable-disable the Elephant Backup systemd unit.
      */
-     static SYSTEMD_UNIT_INSTALLER = path.join('systemd', 'installer.sh');
+     static SYSTEMD_UNIT_INSTALLER = path.join('systemd', 'installer.bash');
 }
 
 export class ZfsUtilities {
@@ -80,7 +80,6 @@ export class ZfsUtilities {
     static #getNowDate() {
         // Get the current time in ISO format.
         const date = new Date();
-        // date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
 
         const fy = date.getFullYear().toString().padStart(4, '0');
         const mo = date.getMonth().toString().padStart(2,'0');
@@ -202,7 +201,6 @@ export class ZfsUtilities {
         // Spawn the backup commands set after creating and building the three below commands.
         // Building the send command of the filesystem.
         const stderrHandler = (/** @type {any} */ data) => {
-        //const stderrHandler = (/** @type {any} */ data) => {
             const dataString = data.toString().trimEnd();
             // print the child's stderr immediately on the application stdout.
             logger.print(`${dataString}`);

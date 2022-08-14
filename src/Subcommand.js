@@ -10,7 +10,6 @@ import { Options, CommandType } from './Options.js';
 import { Logger } from './Logger.js';
 import { ZfsFilesystem } from './ZfsFilesystem.js';
 import { ZfsUtilities } from './ZfsUtilities.js';
-import { Configure } from './Configure.js';
 
 const logger = Logger.getLogger()
 
