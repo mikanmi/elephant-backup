@@ -18,6 +18,11 @@ export class CommandType {
     static SYSTEMD_UNINSTALL = 'systemd-uninstall';
 }
 
+/**
+ * A number, or a string containing a number.
+ * @typedef {{archive: 'unexpected', dryRun: false, verbose: false, list: false}} OptionList
+ */
+
 export class Options {
 
     static #thisInstance = new Options();
@@ -27,8 +32,9 @@ export class Options {
     #subCommand = this.#program;
 
     #targets = [''];
+    /** @type {OptionList} */
     #options = 
-            {archive: 'unexpected', dryRun: false, verbose: false};
+            {archive: 'unexpected', dryRun: false, verbose: false, list: false};
 
     static getInstance() {
         return this.#thisInstance;
@@ -79,7 +85,7 @@ export class Options {
 
     /**
      * Get the command options.
-     * @returns {{archive: string, dryRun: boolean, verbose: boolean}}
+     * @returns {OptionList}
      */
     get options() {
         return this.#options;
@@ -121,11 +127,17 @@ export class Options {
         }
 
         switch(commandType) {
+        // @ts-ignore
+        case CommandType.SNAPSHOT:
+            subcommand
+            .option('-l, --list',
+                    'show the Elephant Backup snapshots.',
+                    false);
+            // Fallthrough
         case CommandType.BACKUP:
         case CommandType.DIFF:
-        case CommandType.SNAPSHOT:
         case CommandType.SYSTEMD_INSTALL:
-                subcommand
+            subcommand
             .argument('<ZFS pools...>',
                     'the names of one or more original ZFS pools.')
             .action((pools, _, command) => {

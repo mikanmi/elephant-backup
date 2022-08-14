@@ -165,23 +165,16 @@ export class ZfsFilesystem {
      * Purge snapshots on the ZFS filesystem.
      */
      async purgeSnapshots() {
-        const now = new Date();
-
-        const list = await this.getSnapshots();
-        const snapshots = list.getSnapshots();
-
-        const snapshotsWithPeriod = this.#splitPeriod(snapshots, now);
-
-        logger.print('snapshotsWithPeriod =============================');
-        logger.print(snapshotsWithPeriod);
+        const snapshotsByPeriod = await this.getSnapshotsByPeriod();
 
         // purge the snapshots one snapshot per one day on the day period.
-        await this.#destroySnapshot(snapshotsWithPeriod.daySnapshot, 1);
+        await this.#destroySnapshot(snapshotsByPeriod.daySnapshot, 1);
+
         // purge the snapshots one snapshot per one week on the week period.
-        await this.#destroySnapshot(snapshotsWithPeriod.weekSnapshot, 7);
+        await this.#destroySnapshot(snapshotsByPeriod.weekSnapshot, 7);
 
         // purge the snapshots over number of the keeping them on the week period.
-        await this.#destroySnapshotNumber(snapshotsWithPeriod.weekSnapshot, Configure.SNAPSHOT_KEEP_WEEKS);
+        await this.#destroySnapshotNumber(snapshotsByPeriod.weekSnapshot, Configure.SNAPSHOT_KEEP_WEEKS);
     }
 
     /**
@@ -201,7 +194,7 @@ export class ZfsFilesystem {
             if (snapshotDate >= earliestSnapshotDate) {
                 // the next date to keep snapshot. 
                 earliestSnapshotDate = snapshotDate;
-                earliestSnapshotDate.setDate(earliestSnapshotDate.getDate() - offset);
+                earliestSnapshotDate.setDate(earliestSnapshotDate.getDate() + offset);
             }
             else {
                 await ZfsUtilities.destroySnapshot(snapshot, this.#name);
@@ -223,21 +216,27 @@ export class ZfsFilesystem {
      }
 
     /**
-     * Split snapshots with the hour period, the day period, the week period.
-     * @param {string[]} snapshots a array of snapshots.
-     * @param {Date} now the current time.
-     * @returns {{hourSnapshot: string[], daySnapshot: string[], weekSnapshot: string[]}}
+     * Get snapshots with the hour period, the day period, the week period from the current time.
+     * @returns {Promise<{hourSnapshot: string[], daySnapshot: string[], weekSnapshot: string[]}>}
      *     an object of snapshots with the period.
      */
-    #splitPeriod(snapshots, now) {
+    async getSnapshotsByPeriod() {
+        const now = new Date();
+
+        const list = await this.getSnapshotList();
+        const snapshots = list.getSnapshots();
+
+        // the hour period is between now to Configure.SNAPSHOT_KEEP_HOURS
         const hourLimit = new Date(now);
         hourLimit.setHours(hourLimit.getHours() - Configure.SNAPSHOT_KEEP_HOURS);
 
+        // the day period is between 'hourLimit'(hours) to Configure.SNAPSHOT_KEEP_DAYS * 24(hours).
         const dayLimit = new Date(now);
         dayLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_DAYS);
 
-        const weekLimit = new Date(now);
-        weekLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_WEEKS * 7);
+        // the week period is between Configure.SNAPSHOT_KEEP_DAYS to long long ago
+        // const weekLimit = new Date(now);
+        // weekLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_WEEKS * 7);
 
         /** @type {string[]} */ 
         const hourSnapshot = [];
@@ -252,12 +251,6 @@ export class ZfsFilesystem {
             if (snapshot.startsWith(prefix)) {
                 const dateString = snapshot.slice(prefix.length);
                 const snapshotTime = ZfsUtilities.parseDate(dateString);
-
-                logger.print('Time=============================');
-                logger.print(snapshotTime);
-                logger.print(hourLimit);
-                logger.print(dayLimit);
-
                 if (snapshotTime > hourLimit) {
                     hourSnapshot.push(snapshot);
                 }
@@ -276,7 +269,7 @@ export class ZfsFilesystem {
      * Get the snapshot list.
      * @return {Promise<SnapshotList>} the list of the snapshots on this filesystem.
      */
-     async getSnapshots() {
+     async getSnapshotList() {
         const cl = Options.getInstance();
         const optionalSnapshot = cl.options.dryRun ? this.#newSnapshot : null;
         const snapshots = await ZfsUtilities.snapshotList(this.#name, optionalSnapshot);

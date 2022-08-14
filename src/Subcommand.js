@@ -146,8 +146,8 @@ class BackupSubcommand extends Subcommand {
         // take the new snapshot now.
         await primaryFilesystem.takeNewSnapshot();
 
-        const prySnapshot = await primaryFilesystem.getSnapshots();
-        const bakSnapshots = await archiveFilesystem.getSnapshots();
+        const prySnapshot = await primaryFilesystem.getSnapshotList();
+        const bakSnapshots = await archiveFilesystem.getSnapshotList();
 
         // find the latest of common snapshots between the primary and the archive.
         let latestOfCommonSnapshots = prySnapshot.findLatest(bakSnapshots);
@@ -253,8 +253,8 @@ class DiffSubcommand extends Subcommand {
         for (const primaryDatasetFilesystem of primaryDatasetFilesystems) {
             const archiveDatasetFilesystem = archiveParentFilesystem.open(primaryDatasetFilesystem.name);            
 
-            const primarySnapshots = await primaryDatasetFilesystem.getSnapshots();
-            const archiveSnapshots = await archiveDatasetFilesystem.getSnapshots();
+            const primarySnapshots = await primaryDatasetFilesystem.getSnapshotList();
+            const archiveSnapshots = await archiveDatasetFilesystem.getSnapshotList();
     
             // Find the latest of common snapshots between the primary and the archive.
             const latestOfCommonSnapshots = primarySnapshots.findLatest(archiveSnapshots) || 'Unexpected Snapshot';
@@ -304,7 +304,12 @@ class SnapshotSubcommand extends Subcommand {
         const options = Options.getInstance();
         const targets = options.targets;
 
-        // start diff process.
+        if (options.options.list) {
+            await this.#showSnapshots(targets);
+            return;
+        }
+
+        // start takeing a snapshot process.
         for (const target of targets) {
             if (list.includes(target)) {
                 await this.#takeSnapshot(target);
@@ -313,8 +318,8 @@ class SnapshotSubcommand extends Subcommand {
     }
 
     /**
-     * diff the primary ZFS filesystem and the archive ZFS filesystem.
-     * @param {string} filesystem a ZFS filesystem to backup.
+     * Take a snapshot on the ZFS filesystem.
+     * @param {string} filesystem a ZFS filesystem which you take on.
      */
     async #takeSnapshot(filesystem) {
         logger.info(`Start to snapshot: on [${filesystem}]`);
@@ -328,6 +333,24 @@ class SnapshotSubcommand extends Subcommand {
         // purge some of oldest snapshots.
         await zfsFilesystem.purgeSnapshots();
     }
+
+    /**
+     * Show the Elephant Backup snapshots.
+     * @param {string[]} filesystems An array of ZFS filesystems which we show snapshots of.
+     */
+    async #showSnapshots(filesystems) {
+        logger.info(`Start to show snapshots: on [${filesystems}]`);
+
+        for (const filesystem of filesystems) {
+            // New the ZFS instance from a ZFS filesystem.
+            const zfsFilesystem = new ZfsFilesystem(filesystem);
+
+            const snapshotByPeriod = await zfsFilesystem.getSnapshotsByPeriod();
+
+            logger.print(snapshotByPeriod);
+        }
+    }
+
 }
 
 class SytemdSubcommand extends Subcommand {
