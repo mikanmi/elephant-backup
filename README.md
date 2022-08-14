@@ -154,7 +154,7 @@ Move the current directory and do below.
 1. Run the development version.
 
    ```bash
-   npm start
+   sudo ./elephant-backup/src/main.js --help
    ```
 
-Login again if install the node.js binary application with the _--global_ option.
+Login again if install Elephant Backup with the _--global_ option.

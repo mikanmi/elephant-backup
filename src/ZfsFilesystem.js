@@ -172,6 +172,9 @@ export class ZfsFilesystem {
 
         const snapshotsWithPeriod = this.#splitPeriod(snapshots, now);
 
+        logger.print('snapshotsWithPeriod =============================');
+        logger.print(snapshotsWithPeriod);
+
         // purge the snapshots one snapshot per one day on the day period.
         await this.#destroySnapshot(snapshotsWithPeriod.daySnapshot, 1);
         // purge the snapshots one snapshot per one week on the week period.
@@ -193,9 +196,9 @@ export class ZfsFilesystem {
         let earliestSnapshotDate = new Date(-8640000000000000);
 
         for (const snapshot of snapshots) {
-            const snapshotStringTime = snapshot.slice(prefix.length + 1);
+            const snapshotStringTime = snapshot.slice(prefix.length);
             const snapshotDate = ZfsUtilities.parseDate(snapshotStringTime);
-            if (snapshotDate <= earliestSnapshotDate) {
+            if (snapshotDate >= earliestSnapshotDate) {
                 // the next date to keep snapshot. 
                 earliestSnapshotDate = snapshotDate;
                 earliestSnapshotDate.setDate(earliestSnapshotDate.getDate() - offset);
@@ -243,23 +246,29 @@ export class ZfsFilesystem {
         /** @type {string[]} */ 
         const weekSnapshot = [];
 
-        snapshots.forEach((snapshot) => {
+        for (const snapshot of snapshots) {
             const prefix = `${Configure.PREFIX_SNAPSHOT}-`;
 
             if (snapshot.startsWith(prefix)) {
-                const dateString = snapshot.slice(prefix.length + 1);
+                const dateString = snapshot.slice(prefix.length);
                 const snapshotTime = ZfsUtilities.parseDate(dateString);
-                if (hourLimit > snapshotTime) {
+
+                logger.print('Time=============================');
+                logger.print(snapshotTime);
+                logger.print(hourLimit);
+                logger.print(dayLimit);
+
+                if (snapshotTime > hourLimit) {
                     hourSnapshot.push(snapshot);
                 }
-                else if (dayLimit > snapshotTime) {
+                else if (snapshotTime > dayLimit) {
                     daySnapshot.push(snapshot);
                 }
                 else {
                     weekSnapshot.push(snapshot);
                 }
             }
-        });
+        }
         return {hourSnapshot, daySnapshot, weekSnapshot};
     }
 

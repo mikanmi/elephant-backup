@@ -99,14 +99,17 @@ export class ZfsUtilities {
      */
      static parseDate(date) {
         const dateElements = date.split('-');
-        const time = dateElements.pop() ?? 'unexpected time';
-        for (let index = 0; index < 3; index+=2) {
-            dateElements.push(time.slice(index, index + 2));
+        const dateTime = dateElements.pop() ?? 'unexpected time';
+        for (let index = 0; index < 6; index+=2) {
+            dateElements.push(dateTime.slice(index, index + 2));
         }
 
         const dateNumbers = dateElements.map(e => Number(e));
         const dateInstance = new Date(Date.UTC(dateNumbers[0], dateNumbers[1], dateNumbers[2],
                 dateNumbers[3], dateNumbers[4], dateNumbers[5]));
+        // UTC to Local Time
+        dateInstance.setMinutes(dateInstance.getMinutes() + dateInstance.getTimezoneOffset());
+
         return dateInstance;
     }
 
@@ -295,7 +298,7 @@ export class ZfsUtilities {
      static async enableSystemd(action, filesystems) {
         const option = action ? Configure.SYSTEMD_BEHAVIOR_ENABLE : Configure.SYSTEMD_BEHAVIOR_DISABLE;
 
-        const zfsCommand = `${ZfsCommands.SYSTEMD_UNIT_INSTALLER} ${option} ${filesystems}`
+        const zfsCommand = `${ZfsCommands.SYSTEMD_UNIT_INSTALLER} ${option} ${filesystems.join(" ")}`
         const command = new Command(zfsCommand);
         command.printStdoutImmediately = true;
         await command.spawnIfNoDryRunAsync();
