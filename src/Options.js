@@ -48,6 +48,7 @@ export class Options {
         this.#configureCommand(CommandType.BACKUP);
         this.#configureCommand(CommandType.DIFF);
         this.#configureCommand(CommandType.SNAPSHOT);
+        this.#configureCommand(CommandType.SYSTEMD);
     }
 
     /**
@@ -135,7 +136,7 @@ export class Options {
                     `'${enable}': Install and enable auto snapshot with systemd, '${disable}': uninstall.`)
             .action((behavior, _, command) => {
                 this.#subCommand = command;
-                this.#targets = behavior;
+                this.#targets = [behavior];
             });
         }
 

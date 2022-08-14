@@ -6,10 +6,11 @@
  */
  'use strict'
 
-export class Configure {
+import path from "node:path";
 
+export class Configure {
     /** @type {string} The absolute path of the log file to store an application log. */
-    static LOG_FILE_PATH = `${process.cwd()}/elephant-backup.log`;
+    static LOG_FILE_PATH = path.join('/var/log/', 'elephant-backup.log');
 
     /** @type {string} The prefix of the name of snapshots */
     static PREFIX_SNAPSHOT = 'elephant-backup';

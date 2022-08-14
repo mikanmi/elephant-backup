@@ -6,6 +6,8 @@
  */
 'use strict'
 
+import path from 'node:path';
+
 import { Command } from './Command.js'
 import { Options } from './Options.js';
 import { Configure } from './Configure.js';
@@ -65,8 +67,7 @@ class ZfsCommands {
     /**
      * @types {string} The command line that enable-disable the Elephant Backup systemd unit.
      */
-     static SETUP_UNIT_SH = 'systemd/setup-unit.sh'
-
+     static SYSTEMD_UNIT_INSTALLER = path.join('systemd', 'installer.sh');
 }
 
 export class ZfsUtilities {
@@ -295,8 +296,9 @@ export class ZfsUtilities {
      static async enableSystemd(action) {
         const option = action ? 'enable' : 'disable';
 
-        const zfsCommand = `${ZfsCommands.SETUP_UNIT_SH} ${option}`
+        const zfsCommand = `${ZfsCommands.SYSTEMD_UNIT_INSTALLER} ${option}`
         const command = new Command(zfsCommand);
+        command.printStdoutImmediately = true;
         await command.spawnIfNoDryRunAsync();
     }
 

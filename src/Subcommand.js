@@ -325,7 +325,7 @@ class SytemdSubcommand extends Subcommand {
         }
 
         const target = targets[0];
-        if (target != Configure.SYSTEMD_BEHAVIOR_ENABLE ||
+        if (target != Configure.SYSTEMD_BEHAVIOR_ENABLE &&
                 target != Configure.SYSTEMD_BEHAVIOR_DISABLE) {
             // undefined behavior.
             logger.exit(`An undefined behavior is specified: ${target}`);
