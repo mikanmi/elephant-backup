@@ -111,7 +111,7 @@ Software Programs:
 - node.js v18.6.0
 - pv 1.6.6
 
-## Developer of Elephant Backup
+## For Developers
 
 Patineboot continues to develop Elephant Backup.
 
@@ -141,7 +141,7 @@ Move the current directory and do below.
    - Install the development version from a local directory.
 
       ```bash
-      cd elephant-backup
+      cd working/elephant-backup
       npm install ../elephant-backup
       ```
 
@@ -157,4 +157,13 @@ Move the current directory and do below.
    sudo ./elephant-backup/src/main.js --help
    ```
 
-Login again if install Elephant Backup with the _--global_ option.
+### Debug
+
+1. Run Elephant Backup with the debugging flag on node.js on remote machine named _ubuntu.local_.
+
+   ```bash
+   cd /home/patine/working/elephant-backup
+   sudo node --inspect-brk=ubuntu.local src/main.js --help
+   ```
+
+1. Run 'Attach to remote' on the Visual Studio Code.

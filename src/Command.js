@@ -135,6 +135,10 @@ export class Command {
             });
             child.on('close', (code, signal) => {
                 logger.debug(`${this.#commandWithArguments} close with code: ${code} / signal: ${signal}`);
+                if (code != 0 ||
+                        signal) {
+                    logger.error(`${this.#commandWithArguments} close error with code: ${code} / signal: ${signal}`);
+                }
                 resolve(stdout);
             });
         });
@@ -158,7 +162,7 @@ export class Command {
 
     /**
      * Add a command to this instance.
-     * @param {Command} command a command to be piped.
+     * @param {Command|null} command a command to be piped. if null, bind the stdout to the null device.
      */
     add(command) {
         this.#nextCommand = command;

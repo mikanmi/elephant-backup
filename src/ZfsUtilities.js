@@ -67,7 +67,7 @@ class ZfsCommands {
     /**
      * @types {string} The command line that enable-disable the Elephant Backup systemd unit.
      */
-     static SYSTEMD_UNIT_INSTALLER = path.join('systemd', 'installer.bash');
+     static ELEBA_SYSTEMD_UNIT_INSTALLER = path.join('systemd', 'installer.bash');
 }
 
 export class ZfsUtilities {
@@ -127,7 +127,7 @@ export class ZfsUtilities {
         const command = new Command(zfsCommand);
         await command.spawnIfNoDryRunAsync();
 
-        logger.info(`Taken the new snapshot: ${snapshotName}`);
+        logger.print(`Taken the new snapshot: ${snapshotName}`);
         return snapshotName;
     }
 
@@ -141,7 +141,7 @@ export class ZfsUtilities {
         const command = new Command(zfsCommand);
         await command.spawnIfNoDryRunAsync();
 
-        logger.info(`Purged the snapshot: ${snapshot}`);
+        logger.print(`Purged the snapshot: ${filesystem}@${snapshot}`);
     }
 
     /**
@@ -298,7 +298,7 @@ export class ZfsUtilities {
      static async enableSystemd(action, filesystems) {
         const option = action ? Configure.SYSTEMD_BEHAVIOR_ENABLE : Configure.SYSTEMD_BEHAVIOR_DISABLE;
 
-        const zfsCommand = `${ZfsCommands.SYSTEMD_UNIT_INSTALLER} ${option} ${filesystems.join(" ")}`
+        const zfsCommand = `${ZfsCommands.ELEBA_SYSTEMD_UNIT_INSTALLER} ${option} ${filesystems.join(" ")}`
         const command = new Command(zfsCommand);
         command.printStdoutImmediately = true;
         await command.spawnIfNoDryRunAsync();

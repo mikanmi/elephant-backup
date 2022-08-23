@@ -9,8 +9,13 @@
 import path from "node:path";
 
 export class Configure {
+    static LOG_START_SENTENCE = '===== Start Elephant Backup =====';
+
     /** @type {string} The absolute path of the log file to store an application log. */
     static LOG_FILE_PATH = path.join('/var/log/', 'elephant-backup.log');
+
+    /** @type {number} The maximum size of the log file */
+    static LOG_FILE_SIZE = 5 * 1024 * 1024; // 5 MiB
 
     /** @type {string} The prefix of the name of snapshots */
     static PREFIX_SNAPSHOT = 'elephant-backup';

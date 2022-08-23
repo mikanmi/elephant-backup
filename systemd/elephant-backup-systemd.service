@@ -5,3 +5,4 @@ After=zfs.target
 [Service]
 Type=simple
 ExecStart=elephant-backup snapshot POOLS_REPLACEMENT
+StandardOutput=file:/dev/null
