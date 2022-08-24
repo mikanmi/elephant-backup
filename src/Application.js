@@ -7,7 +7,6 @@
  "use strict"
 
 import * as fsPromises from 'node:fs/promises';
-import * as readline from 'node:readline';
 
 import { Logger, LogLevel } from './Logger.js';
 import { Options } from './Options.js';
@@ -55,53 +54,82 @@ export class Application {
      * @param {string} filePath 
      * @param {number} size 
      */
-    async #truncateHeadOfFile(filePath, size) {
+     async #truncateHeadOfFile(filePath, size) {
 
-        // calculate the starting position of the file to read.
-        // return immediately if the size variable is shorter than the size of the file.
-        let stats;
+        let fileHandle;
         try {
-            stats = await fsPromises.lstat(filePath);
+            fileHandle = await fsPromises.open(filePath, 'r+');
         }
         catch {
+            // return if the file dose not exist.
             return;
         }
-        const startPositionOnRead = stats.size - size;
+
+        // calculate the starting position to read the file.
+        const stat = await fileHandle.stat()
+        const startPositionOnRead = stat.size - size;
         if (startPositionOnRead <= 0) {
+            // return immediately if the size variable is shorter than the file size.
             return;
         }
 
-        // move the file to a temporary file.
-        const temporaryFilePath = filePath + '.temp';
-        fsPromises.rename(filePath, temporaryFilePath);
-
-        // copy the content of the temporary file with the starting position to the file.
-        const readHandle = await fsPromises.open(temporaryFilePath, 'r');
-        const readStream = readHandle.createReadStream({start: startPositionOnRead});
-        const readLine = readline.createInterface({
-            input: readStream,
-            crlfDelay: Infinity
-        });
-
-        let found = false;
-        const writeHandle = await fsPromises.open(filePath, 'w');
-        for await (const line of readLine) {
-            if (found) {
-                await writeHandle.appendFile(line + '\n');
-                continue;
+        let seeking = true;
+        const buffer = new Uint8Array(16 * 1024); // 16K bytes
+        let readingPosition = startPositionOnRead;
+        let writingPosition = 0;
+        // NOSONAR
+        for (;;) { 
+            const { bytesRead } = await fileHandle.read(buffer, 0, buffer.length, readingPosition);
+            if (bytesRead == 0) {
+                // complete moving the log messages from the read-position to zero-position.
+                break;
             }
-            if (line.includes(Configure.LOG_START_SENTENCE)) {
-                found = true;
-                await writeHandle.appendFile(line + '\n');
+            if (seeking) {
+                const logPosition = this.#findLogPosition(buffer);
+                if (logPosition) {
+                    // start transporting the log
+                    readingPosition += logPosition;
+                    seeking = false;
+                    continue;
+                }
+            }
+            readingPosition += bytesRead;
+
+            if (!seeking) {
+                const { bytesWritten } = await fileHandle.write(buffer, 0, buffer.length, writingPosition);
+                if (bytesWritten != bytesRead) {
+                    throw new Error('Writing to the log file is failed while truncating it.');
+                }
             }
         }
 
-        readStream.close();
-        readHandle.close();
-        writeHandle.close();
+        await fsPromises.truncate(filePath, size);
+    }
 
-        // remove the temporary file.
-        await fsPromises.rm(temporaryFilePath);
+    /**
+     * Find the first single log on the multiple log records.
+     * 
+     * @param {Uint8Array} log a raw array of log file.
+     * @returns zero or positive values of start-position if found, otherwise false. 
+     */
+    #findLogPosition(log) {
+        let found = undefined;
+
+        const utf8Encode = new TextEncoder();
+        const sentence = utf8Encode.encode(Configure.LOG_START_SENTENCE);
+        let finding = 0;
+
+        for (let index = 0; index < log.length; index++) {
+            const character = log[index];
+            if (character == sentence[finding]) {
+                finding++;
+                if (finding == sentence.length) {
+                    found = index;
+                    break;
+                }
+            }
+        }
+        return found;
     }
 }
  
