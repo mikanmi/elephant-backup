@@ -6,9 +6,11 @@
  */
 'use strict'
 
+import * as fsPromises from 'node:fs/promises';
 import util from "node:util";
-import stream from "node:stream"; // NOSONAR
 import console from 'node:console';
+
+import { Configure } from "./Configure.js";
 
 export class LogLevel{
     static DEBUG = ['DBG', 0];
@@ -21,15 +23,11 @@ export class LogLevel{
 /**
  * class Logger.
  * Print and store messages.
+ * Logger class is designed with the Singleton design.
  */
 export class Logger {
 
     static #defaultInstance = new Logger();
-
-    #logLevel = LogLevel.PRINT;
-
-    /** @type{Console|null} */
-    #secondConsole = null;
 
     /**
      * Get the default Logger instance.
@@ -39,19 +37,21 @@ export class Logger {
         return Logger.#defaultInstance;
     }
 
+    /** @type{(string|number)[]} The Log Level. */
+    #logLevel = LogLevel.PRINT;
+
+    /** @type{LogFile}. */
+    #logFile;
+
+    /** @type{Console|null}. */
+    #fileConsole = null;
+
+
     /**
      * Constructor
      */
     constructor() {
-        // nothing to do.
-    }
-
-    /**
-     * Add a console with a writable.
-     * @param {stream.Writable} writable
-     */
-    addConsole(writable) {
-        this.#secondConsole = new console.Console(writable);
+        this.#logFile = new LogFile();
     }
 
     /**
@@ -91,7 +91,20 @@ export class Logger {
 
         const writablePrefix = 
                 `[${dateString}]${caller.filename}:${caller.lineno}[${level[0]}]`;
-        this.#secondConsole?.log(`${writablePrefix} ${message}`);
+        this.#fileConsole?.log(`${writablePrefix} ${message}`);
+    }
+
+    /**
+     * Start logging, and Prints the first log message on terminal.
+     */
+     async startLog() {
+        this.#logFile.truncate();
+
+        this.#fileConsole = await this.#logFile.getConsole();
+
+        const startMessage = Configure.LOG_START_SENTENCE;
+        console.log(startMessage);
+        this.#fileConsole.log(startMessage);
     }
 
     /**
@@ -149,6 +162,115 @@ export class Logger {
         process.exit();
     }
 }
+
+class LogFile {
+
+    /**
+     * Get the Console associate with the log file.
+     * 
+     * @returns {Promise<Console>} the Console.
+     */
+    async getConsole() {
+        const handle = await fsPromises.open(Configure.LOG_FILE_PATH, 'as');
+        const writeStream = handle.createWriteStream();
+
+        return new console.Console(writeStream);
+    }
+
+    /**
+     * Truncate the head of file.
+     */
+     async truncate() {
+        const filePath = Configure.LOG_FILE_PATH;
+        const size = Configure.LOG_FILE_SIZE;
+
+        let fileHandle;
+        try {
+            fileHandle = await fsPromises.open(filePath, 'r+');
+        }
+        catch {
+            // return if the file dose not exist.
+            return;
+        }
+
+        // calculate the starting position to read the file.
+        const stat = await fileHandle.stat()
+        const startPositionOnRead = stat.size - size;
+        if (startPositionOnRead <= 0) {
+            // return immediately if the size variable is shorter than the file size.
+            return;
+        }
+
+        let moving = false;
+        const buffer = new Uint8Array(16 * 1024); // 16K bytes
+        let readingPosition = startPositionOnRead;
+        let writingPosition = 0;
+        // NOSONAR
+        for (;;) {
+            const { bytesRead } = await fileHandle.read(buffer, 0, buffer.length, readingPosition);
+            if (bytesRead == 0) {
+                // complete moving the logs from the read-position to the top.
+                break;
+            }
+            if (!moving) {
+                const position = this.#findSingleLog(buffer, bytesRead);
+                if (position) {
+                    // start moving the finding logs to the top.
+                    readingPosition += position;
+                    moving = true;
+                    continue;
+                }
+            }
+            readingPosition += bytesRead;
+
+            if (moving) {
+                const { bytesWritten } = await fileHandle.write(buffer, 0, bytesRead, writingPosition);
+                if (bytesWritten != bytesRead) {
+                    throw new Error('Writing to the log file is failed while truncating it.');
+                }
+                writingPosition += bytesWritten;
+            }
+        }
+
+        await fsPromises.truncate(filePath, size);
+    }
+
+    /**
+     * Find the first single log on the multiple log records.
+     * 
+     * @param {Uint8Array} chunk a raw array of a part of the multiple log records.
+     * @param {number} chunkSize the size of the raw array. 
+     * @returns {number|undefined} found: an negative, zero, or positive value of start-position if found, otherwise undefined.
+     */
+    #findSingleLog(chunk, chunkSize) {
+        let found = undefined;
+
+        const utf8Encode = new TextEncoder();
+        const sentence = utf8Encode.encode(Configure.LOG_START_SENTENCE);
+
+        let finding = this.#finding;
+
+        for (let index = 0; index < chunkSize; index++) {
+            const character = chunk[index];
+            if (character == sentence[finding]) {
+                finding++;
+                if (finding == sentence.length) {
+                    found = index - sentence.length - 1;
+                    break;
+                }
+            }
+            else {
+                finding = 0;
+            }
+        }
+        this.#finding = finding;
+        return found;
+    }
+
+    /** @type {number} finding: positive value if under considering, need more following chunks. otherwise zero. */
+    #finding = 0;
+}
+
 
 /**
  * Get a caller function from the stack.
