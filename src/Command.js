@@ -138,6 +138,7 @@ export class Command {
                 if (code != 0 ||
                         signal) {
                     logger.error(`${this.#commandWithArguments} close error with code: ${code} / signal: ${signal}`);
+                    throw new Error(`CMD: "${this.#commandWithArguments}" with code: ${code} / signal: ${signal}`);
                 }
                 resolve(stdout);
             });

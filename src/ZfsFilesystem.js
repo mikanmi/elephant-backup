@@ -234,7 +234,7 @@ export class ZfsFilesystem {
         const dayLimit = new Date(now);
         dayLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_DAYS);
 
-        // the week period is between Configure.SNAPSHOT_KEEP_DAYS to long long ago
+        // the week period is between Configure.SNAPSHOT_KEEP_DAYS to a long long ago
         // const weekLimit = new Date(now);
         // weekLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_WEEKS * 7);
 
@@ -270,8 +270,8 @@ export class ZfsFilesystem {
      * @return {Promise<SnapshotList>} the list of the snapshots on this filesystem.
      */
      async getSnapshotList() {
-        const cl = Options.getInstance();
-        const optionalSnapshot = cl.options.dryRun ? this.#newSnapshot : null;
+        const options = Options.getInstance();
+        const optionalSnapshot = options.options.dryRun ? this.#newSnapshot : null;
         const snapshots = await ZfsUtilities.snapshotList(this.#name, optionalSnapshot);
         const list = new SnapshotList(snapshots);
 

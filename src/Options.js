@@ -6,7 +6,7 @@
  */
 'use strict'
 
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 
 import packageJson from '../package.json' assert {type: 'json'};
 
@@ -20,7 +20,7 @@ export class CommandType {
 
 /**
  * A number, or a string containing a number.
- * @typedef {{archive: 'unexpected', dryRun: false, verbose: false, list: false}} OptionList
+ * @typedef {{archive: 'unexpected', dryRun: false, verbose: false, develop: false, list: false}} OptionList
  */
 
 export class Options {
@@ -34,7 +34,7 @@ export class Options {
     #targets = [''];
     /** @type {OptionList} */
     #options = 
-            {archive: 'unexpected', dryRun: false, verbose: false, list: false};
+            {archive: 'unexpected', dryRun: false, verbose: false, develop: false, list: false};
 
     static getInstance() {
         return this.#thisInstance;
@@ -103,26 +103,26 @@ export class Options {
         case CommandType.BACKUP:
             subcommand
             .description('Back up any ZFS filesystems to another ZFS filesystems.')
-            .requiredOption('-a, --archive <ZFS dataset>',
-            'ZFS dataset to store any original ZFS pools.');
+            .requiredOption('-a, --archive <ZFS filesystem>',
+            'Specify <ZFS filesystem> to store any primary ZFS filesystems.');
         break;
         case CommandType.DIFF:
             subcommand
-            .description('Show the differences between the current of the primary filesystems and the latest backup.')
-            .requiredOption('-a, --archive <ZFS dataset>',
-            'ZFS dataset to store any original ZFS pools.');
+            .description('Show the differences between the current of the primary ZFS filesystems and the latest backup.')
+            .requiredOption('-a, --archive <ZFS filesystem>',
+            'Specify <ZFS filesystem> to store any primary ZFS pools.');
             break;
         case CommandType.SNAPSHOT:
             subcommand
-            .description('Take a snapshot and purge some existing snapshots on a filesystem.');
+            .description('Take a snapshot and purge some existing snapshots on a ZFS filesystem.');
             break;
         case CommandType.SYSTEMD_INSTALL:
             subcommand
-            .description('Enable to take a snapshot automatically.');
+            .description('Enable to automatically take snapshots.');
             break;
         case CommandType.SYSTEMD_UNINSTALL:
             subcommand
-            .description('Disable to take a snapshot automatically.');
+            .description('Disable to automatically take snapshots.');
             break;
         }
 
@@ -138,8 +138,8 @@ export class Options {
         case CommandType.DIFF:
         case CommandType.SYSTEMD_INSTALL:
             subcommand
-            .argument('<ZFS pools...>',
-                    'the names of one or more original ZFS pools.')
+            .argument('<ZFS filesystems...>',
+                    'the names of one or more primary ZFS filesystems.')
             .action((pools, _, command) => {
                 this.#subCommand = command;
                 this.#targets = pools;
@@ -159,6 +159,11 @@ export class Options {
                 false)
         .option('-n, --dry-run',
                 'run with no change made.',
-                false);
+                false)
+        .addOption(new Option(
+                '-d, --develop',
+                'run with the develop mode.')
+                .default(false)
+                .conflicts('verbose'));
     }
 }

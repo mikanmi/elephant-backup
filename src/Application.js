@@ -25,6 +25,9 @@ export class Application {
         if (options.options.verbose) {
             logger.setLogLevel(LogLevel.DEBUG);
         }
+        if (options.options.develop) {
+            logger.setLogLevel(LogLevel.DEVL);
+        }
 
         // Start logging, and print the starting message.
         logger.startLog();

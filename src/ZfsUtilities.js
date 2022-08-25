@@ -280,7 +280,7 @@ export class ZfsUtilities {
         const command = new Command(zfsCommand);
         const result = await command.spawnAsync();
 
-        const snapshots = result.split('\n');
+        const snapshots = result === '' ? [] : result.split('\n');
         if (snapshot) {
             snapshots.push(snapshot);
             logger.debug(`Push the snapshot for DryRun option: ${snapshot}`);

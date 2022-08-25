@@ -347,6 +347,7 @@ class SnapshotSubcommand extends Subcommand {
 
             const snapshotByPeriod = await zfsFilesystem.getSnapshotsByPeriod();
 
+            logger.print(`'${zfsFilesystem.name}' has the following snapshots:`);
             logger.print(snapshotByPeriod);
         }
     }

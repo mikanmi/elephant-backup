@@ -17,6 +17,7 @@ export class Configure {
     /** @type {number} The maximum size of the log file */
     static LOG_FILE_SIZE = 5 * 1024 * 1024; // 5 MiB
 
+
     /** @type {string} The prefix of the name of snapshots */
     static PREFIX_SNAPSHOT = 'elephant-backup';
 
@@ -28,6 +29,7 @@ export class Configure {
 
     /** @type {number} The number of hourly snapshots keeping */
     static SNAPSHOT_KEEP_HOURS = 24;
+
 
     /** @type {string} The 'enable' behavior of systemd subcommand */
     static SYSTEMD_BEHAVIOR_ENABLE = 'enable';
