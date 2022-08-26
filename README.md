@@ -12,9 +12,8 @@ Elephant Backup archives any number of ZFS filesystems containing lots of snapsh
 
 ## Official Website
 
-Release Site: <https://www.npmjs.com/package/elephant-backup>
-
-Development Site: <https://github.com/patineboot/elephant-backup>
+- Release Site: <https://www.npmjs.com/package/elephant-backup>
+- Development Site: <https://github.com/patineboot/elephant-backup>
 
 ## Nodejs
 
@@ -42,18 +41,6 @@ See [Installing Node.js via package manager](https://nodejs.org/en/download/pack
    npm install elephant-backup
    ```
 
-1. Install Dependent Commands
-
-   Elephant Backup depends on the 'Pipe Viewer' command.  
-   e.g., Install them on Ubuntu Linux.
-
-   ```bash
-   apt install pv
-   ```
-
-   The websites of the dependent commands:
-   - Pipe Viewer: <https://www.ivarch.com/programs/pv.shtml>
-
 ## Usage
 
 ### Quick Start
@@ -73,21 +60,32 @@ e.g., Back up two of the primary ZFS pools named _home.pool_ and _storage.pool_ 
 sudo elephant-backup backup -a backup.pool home.pool storage.pool
 ```
 
-**Note**: For the first time, configure the archive ZFS filesystem.
+### Snapshot
 
-- Disable the _com.sun:auto-snapshot_ property on the archive ZFS filesystem.
-- Remove all of the snapshots on the archive ZFS filesystem before first.
-
-Disable the com.sun:auto-snapshot property:
+Take snapshots automatically with the `systemd` auto-launcher.
 
 ```bash
-sudo zfs set com.sun:auto-snapshot=false <archive ZFS filesystem>
+elephant-backup systemd-install <primary ZFS filesystem...>
+```
+
+- _\<archive filesystem\>_: the name of the ZFS filesystem that stores the primary ZFS filesystems.
+
+e.g., Take automatically snapshots two of the primary ZFS pools named _home.pool_ and _storage.pool_.
+
+```bash
+sudo elephant-backup systemd-install home.pool storage.pool
+```
+
+Stop to take snapshots automatically.
+
+```bash
+sudo elephant-backup systemd-uninstall
 ```
 
 ### Other Usages
 
 Run the `elephant-backup` command with the `-h` option.  
-Elephant Backup has two sub-commands, `backup` and `diff`, which are also available with the `-h` option.
+Elephant Backup has three sub-commands, `backup`, `diff`, and `snapshot` which are also available with the `-h` option.
 
 ```bash
 elephant-backup -h
@@ -95,6 +93,8 @@ elephant-backup -h
 elephant-backup backup -h
 
 elephant-backup diff -h
+
+elephant-backup snapshot -h
 ```
 
 ## Environment
@@ -109,7 +109,6 @@ Operating System:
 Software Programs:
 
 - node.js v18.6.0
-- pv 1.6.6
 
 ## For Developers
 
