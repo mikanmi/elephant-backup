@@ -125,7 +125,7 @@ export class ZfsFilesystem {
      * @returns {Promise<ZfsFilesystem[]>} a ZfsFilesystem array of all the ZFS datasets contained in the filesystem.
      */
      async openRecursively() {
-        const filesystems = await ZfsUtilities.filesystemListRecursively(this.#name);
+        const filesystems = await ZfsUtilities.filesystemList(this.#name);
         const zfsFilesystems = 
                 filesystems.map((filesystem) => new ZfsFilesystem(filesystem));
         return zfsFilesystems;

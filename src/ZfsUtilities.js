@@ -25,11 +25,6 @@ class ZfsCommands {
     static ZFS_LIST_FILESYSTEM = 'zfs list -H -o name -t filesystem';
 
     /**
-     * @types {string} The command line that shows ZFS filesystems *recursively* on this machine.
-     */
-     static ZFS_LIST_FILESYSTEM_RECURSIVE = 'zfs list -H -r -o name -t filesystem';
-
-    /**
      * @types {string} The command line that shows ZFS filesystems on this machine.
      */
     static ZFS_LIST_SNAPSHOT = 'zfs list -H -s creation -o name -t snapshot';
@@ -240,30 +235,18 @@ export class ZfsUtilities {
     }
 
     /**
-     * Get all of the ZFS filesystems on this machine.
-     * @returns {Promise<string[]>} all of the ZFS filesystems on this machine.
-     */
-    static async filesystemList() {
-        const command = new Command(ZfsCommands.ZFS_LIST_FILESYSTEM);
-        const result = await command.spawnAsync();
-
-        const filesystems = result.split('\n');
-
-        logger.debug(`ZFS filesystems: ${filesystems}`);
-        return filesystems;
-    }
-
-    /**
-     * Get the ZFS filesystems recursively on the ZFS filesystems.
-     * @param {string} filesystem a ZFS filesystem on that this method gets recursively.
+     * Get the child ZFS filesystems recursively on a ZFS filesystems.
+     * @param {string} filesystem a ZFS filesystem that has children. If the empty string(''), return root ZFS filesystems.
+     * @param {boolean} recursive true if get the children recursively, false if get only the children.
      * @returns {Promise<string[]>} the list of the ZFS filesystems recursively on the ZFS filesystems.
      */
-     static async filesystemListRecursively(filesystem) {
+     static async filesystemList(filesystem='', recursive=false) {
+        const recursiveOption = recursive ? '-r' : '';
         const command =
-                new Command(`${ZfsCommands.ZFS_LIST_FILESYSTEM_RECURSIVE} ${filesystem}`);
+                new Command(`${ZfsCommands.ZFS_LIST_FILESYSTEM} ${recursiveOption} ${filesystem}`);
         const result = await command.spawnAsync();
 
-        const filesystems = result.split('\n');
+        const filesystems = result === '' ? [] : result.split('\n');
 
         logger.debug(`ZFS filesystems: ${filesystems}`);
         return filesystems;
