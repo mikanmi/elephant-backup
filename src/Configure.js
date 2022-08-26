@@ -11,7 +11,7 @@ import path from "node:path";
 export class Configure {
 
     /** @type {string} The absolute path of the elephant backup directory. */
-    static ELEPHANT_BACKUP_PATH = path.resolve(path.dirname(process.argv[1]), '..');
+    static ELEPHANT_BACKUP_PATH = 'assign the absolute path after run the elephant backup';
 
     static LOG_START_SENTENCE = '===== Start Elephant Backup =====';
 

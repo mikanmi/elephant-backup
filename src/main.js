@@ -7,8 +7,8 @@
  */
 "use strict"
 
-import { Application } from './Application.js';
+import { ElephantBackup } from './ElephantBackup.js';
 
 // This is the entry point of this application.
-const application = new Application();
+const application = new ElephantBackup();
 await application.start();
