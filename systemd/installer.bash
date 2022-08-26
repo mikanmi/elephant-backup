@@ -3,7 +3,7 @@
 UNIT_NAME='elephant-backup-systemd'
 SYSTEMD_DIR='/etc/systemd/system/'
 
-SCRIPT_DIR=`realpath ./`"/systemd/"
+SCRIPT_DIR=`realpath $(dirname $0)`/
 POOLS=${@:2}
 
 if [ $1 = 'enable' ]; then
@@ -24,6 +24,7 @@ fi
 
 if [ $1 = 'disable' ]; then
     echo "Disable the Elephant Backup systemd unit."
+    systemctl stop ${UNIT_NAME}.timer
     systemctl disable ${UNIT_NAME}.timer
     rm ${SYSTEMD_DIR}${UNIT_NAME}.service
     rm ${SYSTEMD_DIR}${UNIT_NAME}.timer

@@ -62,7 +62,7 @@ class ZfsCommands {
     /**
      * @types {string} The command line that enable-disable the Elephant Backup systemd unit.
      */
-     static ELEBA_SYSTEMD_UNIT_INSTALLER = path.join(Configure.ELEPHANT_BACKUP_PATH, 'systemd', 'installer.bash');
+    static ELEBA_SYSTEMD_UNIT_INSTALLER = path.join('systemd', 'installer.bash');
 }
 
 export class ZfsUtilities {
@@ -281,7 +281,10 @@ export class ZfsUtilities {
      static async enableSystemd(action, filesystems) {
         const option = action ? Configure.SYSTEMD_BEHAVIOR_ENABLE : Configure.SYSTEMD_BEHAVIOR_DISABLE;
 
-        const zfsCommand = `${ZfsCommands.ELEBA_SYSTEMD_UNIT_INSTALLER} ${option} ${filesystems.join(" ")}`
+        const elephantPath = await Configure.getElephantBackupPath();
+        const installerPath = path.join(elephantPath, ZfsCommands.ELEBA_SYSTEMD_UNIT_INSTALLER);
+
+        const zfsCommand = `${installerPath} ${option} ${filesystems.join(" ")}`;
         const command = new Command(zfsCommand);
         command.printStdoutImmediately = true;
         await command.spawnIfNoDryRunAsync();
