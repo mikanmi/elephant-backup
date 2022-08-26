@@ -9,6 +9,10 @@
 import path from "node:path";
 
 export class Configure {
+
+    /** @type {string} The absolute path of the elephant backup directory. */
+    static ELEPHANT_BACKUP_PATH = path.resolve(path.dirname(process.argv[1]), '..');
+
     static LOG_START_SENTENCE = '===== Start Elephant Backup =====';
 
     /** @type {string} The absolute path of the log file to store an application log. */

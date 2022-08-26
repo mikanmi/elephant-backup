@@ -62,7 +62,7 @@ class ZfsCommands {
     /**
      * @types {string} The command line that enable-disable the Elephant Backup systemd unit.
      */
-     static ELEBA_SYSTEMD_UNIT_INSTALLER = path.join('systemd', 'installer.bash');
+     static ELEBA_SYSTEMD_UNIT_INSTALLER = path.join(Configure.ELEPHANT_BACKUP_PATH, 'systemd', 'installer.bash');
 }
 
 export class ZfsUtilities {
