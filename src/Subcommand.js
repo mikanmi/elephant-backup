@@ -61,8 +61,8 @@ export class Subcommand {
     }
 
     /**
-     * The ZFS filesystems of the command options are accessible or exit.
-     * @returns true if accessible, otherwise false.
+     * The ZFS filesystems of the command options are accessible or not.
+     * @returns {Promise<boolean>} true if accessible, otherwise false.
      */
     async accessibleFilesystems() {
         return false;
@@ -85,10 +85,10 @@ export class Subcommand {
 
 class BackupSubcommand extends Subcommand {
     /**
-     * The ZFS filesystems of the command options are accessible or exit.
-     * @returns true if accessible, otherwise exit.
+     * The ZFS filesystems of the command options are accessible or not.
+     * @returns {Promise<boolean>} true if accessible, otherwise false.
      */
-    async accessibleFilesystems() {
+     async accessibleFilesystems() {
         const list = await ZfsUtilities.filesystemList();
 
         const options = Options.getInstance();
@@ -186,8 +186,8 @@ class BackupSubcommand extends Subcommand {
 
 class DiffSubcommand extends Subcommand {
     /**
-     * The ZFS filesystems of the command options are accessible or exit.
-     * @returns true if accessible, otherwise exit.
+     * The ZFS filesystems of the command options are accessible or not.
+     * @returns {Promise<boolean>} true if accessible, otherwise false.
      */
      async accessibleFilesystems() {
         const list = await ZfsUtilities.filesystemList();
@@ -271,23 +271,10 @@ class DiffSubcommand extends Subcommand {
 
 class SnapshotSubcommand extends Subcommand {
     /**
-     * The ZFS filesystems of the command options are accessible or exit.
-     * @returns true if accessible, otherwise exit.
+     * The ZFS filesystems of the command options are accessible or not.
+     * @returns {Promise<boolean>} true if accessible, otherwise false.
      */
      async accessibleFilesystems() {
-        // exit if the ZFS filesystems, which a user specifies, do not exist on the machine.
-        const list = await ZfsUtilities.filesystemList();
-
-        const options = Options.getInstance();
-        const targets = options.targets;
-
-        for (const target of targets) {
-            if (!list.includes(target)) {
-                logger.warn(`A ZFS pool/dataset to taking a snapshot is not exist: ${target}`);
-                logger.warn(`Skipping a snapshot on the ZFS pool/dataset: ${target}`);
-            }
-        }
-
         return true;
     }
 
@@ -304,15 +291,16 @@ class SnapshotSubcommand extends Subcommand {
         const options = Options.getInstance();
         const targets = options.targets;
 
-        if (options.options.list) {
-            await this.#showSnapshots(targets);
-            return;
-        }
+        const showOrTakeFunction = options.options.list ? this.#showSnapshots : this.#takeSnapshot;
 
         // start takeing a snapshot process.
         for (const target of targets) {
             if (list.includes(target)) {
-                await this.#takeSnapshot(target);
+                await showOrTakeFunction(target);
+            }
+            else {
+                logger.warn(`A ZFS pool/dataset to taking a snapshot is not exist: ${target}`);
+                logger.warn(`Skipping a snapshot on the ZFS pool/dataset: ${target}`);
             }
         }
     }
@@ -336,22 +324,18 @@ class SnapshotSubcommand extends Subcommand {
 
     /**
      * Show the Elephant Backup snapshots.
-     * @param {string[]} filesystems An array of ZFS filesystems which we show snapshots of.
+     * @param {string} filesystem An array of ZFS filesystems which we show snapshots of.
      */
-    async #showSnapshots(filesystems) {
-        logger.info(`Start to show snapshots: on [${filesystems}]`);
+    async #showSnapshots(filesystem) {
+        logger.info(`Start to show snapshots: on [${filesystem}]`);
 
-        for (const filesystem of filesystems) {
-            // New the ZFS instance from a ZFS filesystem.
-            const zfsFilesystem = new ZfsFilesystem(filesystem);
+        // New the ZFS instance from a ZFS filesystem.
+        const zfsFilesystem = new ZfsFilesystem(filesystem);
+        const snapshotByPeriod = await zfsFilesystem.getSnapshotsByPeriod();
 
-            const snapshotByPeriod = await zfsFilesystem.getSnapshotsByPeriod();
-
-            logger.print(`'${zfsFilesystem.name}' has the following snapshots:`);
-            logger.print(snapshotByPeriod);
-        }
+        logger.print(`'${zfsFilesystem.name}' has the following snapshots:`);
+        logger.print(snapshotByPeriod);
     }
-
 }
 
 class SytemdSubcommand extends Subcommand {
