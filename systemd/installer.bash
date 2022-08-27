@@ -18,14 +18,14 @@ if [ $1 = 'enable' ]; then
     sed -i -e "s/POOLS_REPLACEMENT/${POOLS}/g" ${SYSTEMD_DIR}${UNIT_NAME}.service
 
     echo "Enable the Elephant Backup systemd unit."
-    systemctl enable --now ${UNIT_NAME}.timer
+    systemctl enable --now ${UNIT_NAME}.timer 2>&1
     exit 0
 fi
 
 if [ $1 = 'disable' ]; then
     echo "Disable the Elephant Backup systemd unit."
     systemctl stop ${UNIT_NAME}.timer
-    systemctl disable ${UNIT_NAME}.timer
+    systemctl disable ${UNIT_NAME}.timer 2>&1
     rm ${SYSTEMD_DIR}${UNIT_NAME}.service
     rm ${SYSTEMD_DIR}${UNIT_NAME}.timer
     exit 0
