@@ -7,11 +7,24 @@
  'use strict'
 
 import path from "node:path";
+import * as fsPromises from 'node:fs/promises';
 
 export class Configure {
 
-    /** @type {string} The absolute path of the elephant backup directory. */
-    static ELEPHANT_BACKUP_PATH = path.resolve(path.dirname(process.argv[1]), '..');
+    /**
+     * Get the absolute path of Elephant Backup module. 
+     * @returns {Promise<string>} The absolute path of the elephant backup directory.
+     */
+    static async getElephantBackupPath() {
+        let elephantPath = process.argv[1];
+        const lstat = await fsPromises.lstat(elephantPath);
+        if (lstat.isSymbolicLink()) {
+            const link = await fsPromises.readlink(elephantPath);
+            elephantPath = path.resolve(path.dirname(elephantPath), link);
+        }
+        elephantPath = path.resolve(elephantPath, '..', '..');
+        return elephantPath;
+    }
 
     static LOG_START_SENTENCE = '===== Start Elephant Backup =====';
 

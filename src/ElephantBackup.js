@@ -12,7 +12,7 @@ import { Subcommand } from './Subcommand.js';
 
 const logger = Logger.getLogger();
  
-export class Application {
+export class ElephantBackup {
 
     constructor() {
         const options = Options.getInstance();
