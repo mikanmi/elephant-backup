@@ -11,7 +11,7 @@
             "address": "ubuntu.local",
             "port": 9229,
             "localRoot": "${workspaceFolder}",
-            "remoteRoot": "/home/patine/working/elephant-backup"
+            "remoteRoot": "/home/patine/evaluation/elephant-backup"
         }
     ]
 }

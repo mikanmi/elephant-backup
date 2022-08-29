@@ -9,6 +9,7 @@
 import { Configure } from "./Configure.js";
 import { Logger } from "./Logger.js";
 import { Options } from "./Options.js";
+import { Snapshot } from "./Snapshot.js";
 import { ZfsUtilities } from "./ZfsUtilities.js";
 
 const logger = Logger.getLogger();
@@ -84,6 +85,54 @@ export class SnapshotList {
         return this.#snapshots;
     }
 
+    /**
+     * Get snapshots with the hour period, the day period, the week period from the current time.
+     * @returns {Promise<{hourSnapshot: string[], daySnapshot: string[], weekSnapshot: string[]}>}
+     *     an object of snapshots with the period.
+     */
+    async getSnapshotsByPeriod() {
+        const now = new Date();
+
+        const snapshots = this.#snapshots;
+
+        // the hour period is between now to Configure.SNAPSHOT_KEEP_HOURS
+        const hourLimit = new Date(now);
+        hourLimit.setHours(hourLimit.getHours() - Configure.SNAPSHOT_KEEP_HOURS);
+
+        // the day period is between 'hourLimit'(hours) to Configure.SNAPSHOT_KEEP_DAYS * 24(hours).
+        const dayLimit = new Date(now);
+        dayLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_DAYS);
+
+        // the week period is between Configure.SNAPSHOT_KEEP_DAYS to a long long ago
+        // const weekLimit = new Date(now);
+        // weekLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_WEEKS * 7);
+
+        /** @type {string[]} */ 
+        const hourSnapshot = [];
+        /** @type {string[]} */ 
+        const daySnapshot = [];
+        /** @type {string[]} */ 
+        const weekSnapshot = [];
+
+        for (const snapshotName of snapshots) {
+            const isCorrected = Snapshot.isCorrectedName(snapshotName);
+            if (!isCorrected) {
+                continue;
+            }
+            const snapshot = new Snapshot(snapshotName);
+            const snapshotTime = snapshot.getDate();
+            if (snapshotTime > hourLimit) {
+                hourSnapshot.push(snapshotName);
+            }
+            else if (snapshotTime > dayLimit) {
+                daySnapshot.push(snapshotName);
+            }
+            else {
+                weekSnapshot.push(snapshotName);
+            }
+        }
+        return {hourSnapshot, daySnapshot, weekSnapshot};
+    }
 }
 
 export class ZfsFilesystem {
@@ -156,16 +205,19 @@ export class ZfsFilesystem {
      * Take the new snapshot on the ZFS filesystem.
      */
     async takeNewSnapshot() {
-        // take the new snapshot and get the snapshot list on the filesystem.
-        const snapshot = await ZfsUtilities.takeSnapshot(this.#name);
-        this.#newSnapshot = snapshot;
+        // take the new snapshot on the filesystem and remember the new snapshot.
+        const snapshot = Snapshot.createSnapshot();
+
+        const newSnapshot = await ZfsUtilities.takeSnapshot(snapshot.name, this.#name);
+        this.#newSnapshot = newSnapshot;
     }
 
     /**
      * Purge snapshots on the ZFS filesystem.
      */
      async purgeSnapshots() {
-        const snapshotsByPeriod = await this.getSnapshotsByPeriod();
+        const snapshotList = await this.getSnapshotList();
+        const snapshotsByPeriod = await snapshotList.getSnapshotsByPeriod();
 
         // purge the snapshots one snapshot per one day on the day period.
         await this.#destroySnapshot(snapshotsByPeriod.daySnapshot, 1);
@@ -183,21 +235,24 @@ export class ZfsFilesystem {
      * @param {number} offset a date offset to decrease the base date.
      */
      async #destroySnapshot(snapshots, offset) {
-        const prefix = `${Configure.PREFIX_SNAPSHOT}-`
-
         // minimum date on JavaScript
         let earliestSnapshotDate = new Date(-8640000000000000);
 
-        for (const snapshot of snapshots) {
-            const snapshotStringTime = snapshot.slice(prefix.length);
-            const snapshotDate = ZfsUtilities.parseDate(snapshotStringTime);
+        for (const snapshotName of snapshots) {
+            const isCorrected = Snapshot.isCorrectedName(snapshotName);
+            if (!isCorrected) {
+                // the snapshot is not Elephant Backup's snapshot.
+                continue;
+            }
+            const snapshot = new Snapshot(snapshotName);
+            const snapshotDate = snapshot.getDate();
             if (snapshotDate >= earliestSnapshotDate) {
                 // the next date to keep snapshot. 
                 earliestSnapshotDate = snapshotDate;
                 earliestSnapshotDate.setDate(earliestSnapshotDate.getDate() + offset);
             }
             else {
-                await ZfsUtilities.destroySnapshot(snapshot, this.#name);
+                await ZfsUtilities.destroySnapshot(snapshotName, this.#name);
             }
         }
      }
@@ -214,56 +269,6 @@ export class ZfsFilesystem {
             await ZfsUtilities.destroySnapshot(snapshots[number], this.#name);
         }
      }
-
-    /**
-     * Get snapshots with the hour period, the day period, the week period from the current time.
-     * @returns {Promise<{hourSnapshot: string[], daySnapshot: string[], weekSnapshot: string[]}>}
-     *     an object of snapshots with the period.
-     */
-    async getSnapshotsByPeriod() {
-        const now = new Date();
-
-        const list = await this.getSnapshotList();
-        const snapshots = list.getSnapshots();
-
-        // the hour period is between now to Configure.SNAPSHOT_KEEP_HOURS
-        const hourLimit = new Date(now);
-        hourLimit.setHours(hourLimit.getHours() - Configure.SNAPSHOT_KEEP_HOURS);
-
-        // the day period is between 'hourLimit'(hours) to Configure.SNAPSHOT_KEEP_DAYS * 24(hours).
-        const dayLimit = new Date(now);
-        dayLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_DAYS);
-
-        // the week period is between Configure.SNAPSHOT_KEEP_DAYS to a long long ago
-        // const weekLimit = new Date(now);
-        // weekLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_WEEKS * 7);
-
-        /** @type {string[]} */ 
-        const hourSnapshot = [];
-        /** @type {string[]} */ 
-        const daySnapshot = [];
-        /** @type {string[]} */ 
-        const weekSnapshot = [];
-
-        for (const snapshot of snapshots) {
-            const prefix = `${Configure.PREFIX_SNAPSHOT}-`;
-
-            if (snapshot.startsWith(prefix)) {
-                const dateString = snapshot.slice(prefix.length);
-                const snapshotTime = ZfsUtilities.parseDate(dateString);
-                if (snapshotTime > hourLimit) {
-                    hourSnapshot.push(snapshot);
-                }
-                else if (snapshotTime > dayLimit) {
-                    daySnapshot.push(snapshot);
-                }
-                else {
-                    weekSnapshot.push(snapshot);
-                }
-            }
-        }
-        return {hourSnapshot, daySnapshot, weekSnapshot};
-    }
 
     /**
      * Get the snapshot list.

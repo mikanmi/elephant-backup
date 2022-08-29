@@ -36,7 +36,7 @@ export class Configure {
 
 
     /** @type {string} The prefix of the name of snapshots */
-    static PREFIX_SNAPSHOT = 'elephant-backup';
+    static PREFIX_SNAPSHOT = 'elephant';
 
     /** @type {number} The number of weekly snapshots keeping */
     static SNAPSHOT_KEEP_WEEKS = 104;

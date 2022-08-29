@@ -66,64 +66,20 @@ class ZfsCommands {
 }
 
 export class ZfsUtilities {
-
-    /**
-     * @type {string} The time used in taking a snapshot.
-     */
-    static #now = ZfsUtilities.#getNowDate();
-
-    static #getNowDate() {
-        // Get the current time in ISO format.
-        const date = new Date();
-
-        const fy = date.getFullYear().toString().padStart(4, '0');
-        const mo = (date.getMonth() + 1).toString().padStart(2,'0');
-        const d = date.getDate().toString().padStart(2,'0');
-        const h = date.getHours().toString().padStart(2,'0');
-        const mi = date.getMinutes().toString().padStart(2,'0');
-        const s = date.getSeconds().toString().padStart(2,'0');
-
-        const localDate = `${fy}-${mo}-${d}-${h}${mi}${s}`;
-        return localDate;
-    }
-
-    /**
-     * Parse a date string.
-     * @param {string} date a date string used on snapshot.
-     * @returns {Date} a Date instance made from the date string.
-     */
-     static parseDate(date) {
-        const dateElements = date.split('-');
-        const dateTime = dateElements.pop() ?? 'unexpected time';
-        for (let index = 0; index < 6; index+=2) {
-            dateElements.push(dateTime.slice(index, index + 2));
-        }
-
-        const dateNumbers = dateElements.map(e => Number(e));
-        const dateInstance = new Date(Date.UTC(dateNumbers[0], dateNumbers[1], dateNumbers[2],
-                dateNumbers[3], dateNumbers[4], dateNumbers[5]));
-        // UTC to Local Time
-        dateInstance.setMinutes(dateInstance.getMinutes() + dateInstance.getTimezoneOffset());
-
-        return dateInstance;
-    }
-
     /**
      * Take a snapshot on the ZFS filesystem.
+     * @param {string} snapshot a snapshot.
      * @param {string} filesystem a ZFS filesystem.
-     * @return {Promise<string>} the new snapshot.
+     * @return {Promise<string>} the new snapshot name.
      */
-     static async takeSnapshot(filesystem) {
-        const snapshotTag = `${Configure.PREFIX_SNAPSHOT}-${ZfsUtilities.#now}`;
-
-        const snapshotName = `${filesystem}@${snapshotTag}`
-
-        const zfsCommand = `${ZfsCommands.ZFS_SNAPSHOT_RECURSIVE} ${snapshotName}`;
+     static async takeSnapshot(snapshot, filesystem) {
+        const fullSnapshotName = `${filesystem}@${snapshot}`
+        const zfsCommand = `${ZfsCommands.ZFS_SNAPSHOT_RECURSIVE} ${fullSnapshotName}`;
         const command = new Command(zfsCommand);
         await command.spawnIfNoDryRunAsync();
 
-        logger.print(`Taken the new snapshot: ${snapshotName}`);
-        return snapshotName;
+        logger.print(`Taken the new snapshot: ${fullSnapshotName}`);
+        return fullSnapshotName;
     }
 
     /**
