@@ -168,7 +168,7 @@ Move the current directory and do below.
 1. Change `remoteRoot` on the _.vscode/launch.json_ file.
 
    ```json
-   "remoteRoot": "/home/patine/evaluation/elephant-backup"
+   "remoteRoot": "/home/patine/working/elephant-backup"
    ```
 
 1. Run 'Attach to remote' on the Visual Studio Code.
