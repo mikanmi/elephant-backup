@@ -245,19 +245,4 @@ export class ZfsUtilities {
         command.printStdoutImmediately = true;
         await command.spawnIfNoDryRunAsync();
     }
-
-    /**
-     * Elephant Backup is run on the super user or not.
-     * @return {boolean} true if Elephant Backup is run on the super user, otherwise false.
-     */
-    static isSuperUser() {
-        // geteuid and getuid are possibly undefined.
-        if (!process.geteuid || !process.getuid) {
-            return false;
-        }
-
-        const euid = process.geteuid();
-        const uid = process.getuid();
-        return euid == 0 && uid == 0;
-    }
 }

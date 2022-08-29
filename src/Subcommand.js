@@ -69,13 +69,6 @@ export class Subcommand {
     }
 
     async checkCondition() {
-        const options = Options.getInstance();
-
-        if (!options.options.dryRun && !ZfsUtilities.isSuperUser()) {
-            // run the diff Subcommand of Elephant Backup on a normal user.
-            logger.exit(`Run the ${options.subcommand} on the SUPER user.`);
-        }
-
         const accessible = await this.accessibleFilesystems();
         if (!accessible) {
             logger.exit('Any ZFS filesystems are not accessible.');
