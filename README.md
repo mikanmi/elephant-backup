@@ -15,24 +15,6 @@ Elephant Backup archives any number of ZFS filesystems containing lots of snapsh
 - Release Site: <https://www.npmjs.com/package/elephant-backup>
 - Development Site: <https://github.com/patineboot/elephant-backup>
 
-## Nodejs
-
-Install node.js on Ubuntu Linux.
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-sudo apt-get install -y nodejs
-```
-
-Uninstall node.js on Ubuntu Linux.
-
-```bash
-sudo apt-get purge nodejs
-sudo rm -r /etc/apt/sources.list.d/nodesource.list
-```
-
-See [Installing Node.js via package manager](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions) on other platforms.
-
 ## Install
 
 1. Install Elephant Backup
@@ -54,10 +36,10 @@ elephant-backup backup -a <archive ZFS filesystem> <primary ZFS filesystem...>
 - _\<archive filesystem\>_: the name of the ZFS filesystem that stores the primary ZFS filesystems.
 - _\<original filesystem...>_: one or more names of the primary ZFS filesystem that is primary ZFS filesystem.
 
-e.g., Back up two of the primary ZFS pools named _home.pool_ and _storage.pool_ to the _backup.pool_ pool.
+e.g., Back up two of the primary ZFS pools named _root.pool_ and _storage.pool_ to the _backup.pool_ pool.
 
 ```bash
-sudo elephant-backup backup -a backup.pool home.pool storage.pool
+sudo elephant-backup backup -a backup.pool root.pool storage.pool
 ```
 
 ### Snapshot
@@ -70,10 +52,10 @@ elephant-backup systemd-install <primary ZFS filesystem...>
 
 - _\<archive filesystem\>_: the name of the ZFS filesystem that stores the primary ZFS filesystems.
 
-e.g., Take automatically snapshots two of the primary ZFS pools named _home.pool_ and _storage.pool_.
+e.g., Take automatically snapshots two of the primary ZFS pools named _root.pool_ and _storage.pool_.
 
 ```bash
-sudo elephant-backup systemd-install home.pool storage.pool
+sudo elephant-backup systemd-install root.pool storage.pool
 ```
 
 Stop to take snapshots automatically.
@@ -109,6 +91,24 @@ Operating System:
 Software Programs:
 
 - node.js v18.6.0
+
+## Nodejs
+
+Install node.js on Ubuntu Linux.
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+Uninstall node.js on Ubuntu Linux.
+
+```bash
+sudo apt-get purge nodejs
+sudo rm -r /etc/apt/sources.list.d/nodesource.list
+```
+
+See [Installing Node.js via package manager](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions) on other platforms.
 
 ## For Developers
 
