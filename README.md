@@ -165,4 +165,10 @@ Move the current directory and do below.
    sudo node --inspect-brk=ubuntu.local src/main.js --help
    ```
 
+1. Change `remoteRoot` on the _.vscode/launch.json_ file.
+
+   ```json
+   "remoteRoot": "/home/patine/evaluation/elephant-backup"
+   ```
+
 1. Run 'Attach to remote' on the Visual Studio Code.
