@@ -78,14 +78,6 @@ export class SnapshotList {
      }
 
     /**
-     * Get the array of snapshots on this instance.
-     * @returns {string[]} the array of snapshots.
-     */
-    getSnapshots() {
-        return this.#snapshots;
-    }
-
-    /**
      * Get snapshots with the hour period, the day period, the week period from the current time.
      * @returns {Promise<{hourSnapshot: string[], daySnapshot: string[], weekSnapshot: string[]}>}
      *     an object of snapshots with the period.
