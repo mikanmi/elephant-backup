@@ -325,10 +325,10 @@ class SnapshotSubcommand extends Subcommand {
         // New the ZFS instance from a ZFS filesystem.
         const zfsFilesystem = new ZfsFilesystem(filesystem);
         const snapshotList = await zfsFilesystem.getSnapshotList();
-        const snapshotByPeriod = await snapshotList.getSnapshotsByPeriod();
+        const snapshotsByGeneration = await snapshotList.getSnapshotsByGenerations();
 
         logger.print(`'${zfsFilesystem.name}' has the following snapshots:`);
-        logger.print(snapshotByPeriod);
+        logger.print(snapshotsByGeneration);
     }
 }
 

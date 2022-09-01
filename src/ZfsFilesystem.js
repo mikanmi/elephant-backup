@@ -78,33 +78,33 @@ export class SnapshotList {
      }
 
     /**
-     * Get snapshots with the hour period, the day period, the week period from the current time.
-     * @returns {Promise<{hourSnapshot: string[], daySnapshot: string[], weekSnapshot: string[]}>}
-     *     an object of snapshots with the period.
+     * Get snapshots by the young, the middle, and the old generations.
+     * @returns {Promise<{youngSnapshots: string[], middleSnapshots: string[], oldSnapshots: string[]}>}
+     *     an object of snapshots by the young, the middle, and the old generations.
      */
-    async getSnapshotsByPeriod() {
+    async getSnapshotsByGenerations() {
         const now = new Date();
 
         const snapshots = this.#snapshots;
 
-        // the hour period is between now to Configure.SNAPSHOT_KEEP_HOURS
+        // the young generation is between now to Configure.SNAPSHOT_KEEP_HOURS
         const hourLimit = new Date(now);
         hourLimit.setHours(hourLimit.getHours() - Configure.SNAPSHOT_KEEP_HOURS);
 
-        // the day period is between 'hourLimit'(hours) to Configure.SNAPSHOT_KEEP_DAYS * 24(hours).
+        // the middle generation is between 'hourLimit'(hours) to Configure.SNAPSHOT_KEEP_DAYS * 24(hours).
         const dayLimit = new Date(now);
-        dayLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_DAYS);
+        dayLimit.setDate(dayLimit.getDate() - Configure.SNAPSHOT_KEEP_DAYS);
 
-        // the week period is between Configure.SNAPSHOT_KEEP_DAYS to a long long ago
+        // the old generation is between Configure.SNAPSHOT_KEEP_DAYS to the infinite time.
         // const weekLimit = new Date(now);
         // weekLimit.setDate(hourLimit.getDate() - Configure.SNAPSHOT_KEEP_WEEKS * 7);
 
         /** @type {string[]} */ 
-        const hourSnapshot = [];
+        const youngSnapshots = [];
         /** @type {string[]} */ 
-        const daySnapshot = [];
+        const middleSnapshots = [];
         /** @type {string[]} */ 
-        const weekSnapshot = [];
+        const oldSnapshots = [];
 
         for (const snapshotName of snapshots) {
             const isCorrected = Snapshot.isCorrectedName(snapshotName);
@@ -114,16 +114,17 @@ export class SnapshotList {
             const snapshot = new Snapshot(snapshotName);
             const snapshotTime = snapshot.getDate();
             if (snapshotTime > hourLimit) {
-                hourSnapshot.push(snapshotName);
+                youngSnapshots.push(snapshotName);
             }
             else if (snapshotTime > dayLimit) {
-                daySnapshot.push(snapshotName);
+                middleSnapshots.push(snapshotName);
             }
             else {
-                weekSnapshot.push(snapshotName);
+                oldSnapshots.push(snapshotName);
             }
         }
-        return {hourSnapshot, daySnapshot, weekSnapshot};
+        const result = {youngSnapshots, middleSnapshots, oldSnapshots};
+        return result;
     }
 }
 
@@ -209,16 +210,16 @@ export class ZfsFilesystem {
      */
      async purgeSnapshots() {
         const snapshotList = await this.getSnapshotList();
-        const snapshotsByPeriod = await snapshotList.getSnapshotsByPeriod();
+        const snapshotsByGeneration = await snapshotList.getSnapshotsByGenerations();
 
         // purge the snapshots one snapshot per one day on the day period.
-        await this.#destroySnapshot(snapshotsByPeriod.daySnapshot, 1);
+        await this.#destroySnapshot(snapshotsByGeneration.middleSnapshots, 1);
 
         // purge the snapshots one snapshot per one week on the week period.
-        await this.#destroySnapshot(snapshotsByPeriod.weekSnapshot, 7);
+        await this.#destroySnapshot(snapshotsByGeneration.oldSnapshots, 7);
 
         // purge the snapshots over number of the keeping them on the week period.
-        await this.#destroySnapshotNumber(snapshotsByPeriod.weekSnapshot, Configure.SNAPSHOT_KEEP_WEEKS);
+        await this.#destroySnapshotNumber(snapshotsByGeneration.oldSnapshots, Configure.SNAPSHOT_KEEP_WEEKS);
     }
 
     /**
