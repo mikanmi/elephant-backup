@@ -23,6 +23,17 @@ Elephant Backup archives any number of ZFS filesystems containing lots of snapsh
    npm install elephant-backup
    ```
 
+Note:
+
+Install `npm` with the `apt` package manager if `npm` does not exist on Ubuntu.
+Install `node` with `npm` and **reboot** after installing `npm`.
+
+   ```bash
+   apt install npm
+   npm --global install node
+   reboot
+   ```
+
 ## Usage
 
 ### Quick Start
@@ -92,24 +103,6 @@ Software Programs:
 
 - node.js v18.6.0
 
-## Nodejs
-
-Install node.js on Ubuntu Linux.
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-sudo apt-get install -y nodejs
-```
-
-Uninstall node.js on Ubuntu Linux.
-
-```bash
-sudo apt-get purge nodejs
-sudo rm -r /etc/apt/sources.list.d/nodesource.list
-```
-
-See [Installing Node.js via package manager](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions) on other platforms.
-
 ## For Developers
 
 Patineboot continues to develop Elephant Backup.
@@ -172,3 +165,21 @@ Move the current directory and do below.
    ```
 
 1. Run 'Attach to remote' on the Visual Studio Code.
+
+### Nodejs
+
+Install node.js on Ubuntu Linux.
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+Uninstall node.js on Ubuntu Linux.
+
+```bash
+sudo apt-get purge nodejs
+sudo rm -r /etc/apt/sources.list.d/nodesource.list
+```
+
+See [Installing Node.js via package manager](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions) on other platforms.

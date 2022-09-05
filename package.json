@@ -29,7 +29,8 @@
     "Incremental"
   ],
   "scripts": {
-    "start": "node src/main.js"
+    "start": "node src/main.js",
+    "test": "node --test test/" 
   },
   "dependencies": {
     "commander": "^9.3.0"

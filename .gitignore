@@ -108,3 +108,4 @@ dist
 
 # the output directory of tscompile.
 built/
+temporary/

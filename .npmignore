@@ -133,3 +133,4 @@ dist
 # patineboot adds
 elephant-backup.log
 example-getting-started.sh
+temporary/
