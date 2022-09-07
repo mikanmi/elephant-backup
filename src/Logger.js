@@ -50,6 +50,13 @@ class LogWriter {
     }
 
     /**
+     * Prepare this LogWriter.
+     */
+    async prepare() {
+        // nothing to do.
+    }
+
+    /**
      * Write the message to the log file.
      * 
      * @param {string} line a line to write to the log file.
@@ -61,6 +68,13 @@ class LogWriter {
 }
 
 class ConsoleLogWriter extends LogWriter {
+    /**
+     * Prepare this LogWriter.
+     */
+    async prepare() {
+        // nothing to do.
+    }
+
     /**
      * Write the message to the log file.
      * 
@@ -74,13 +88,32 @@ class ConsoleLogWriter extends LogWriter {
 class FileLogWriter extends LogWriter {
 
     /** @type {number} */
-    #fileHandle;
+    #fileHandle = -1;
 
     /**
      * Constructor. Open the log file.
      */
     constructor() {
         super();
+    }
+
+    /**
+     * Prepare this LogWriter.
+     */
+    async prepare() {
+        const filePath = Configure.LOG_FILE_PATH;
+        const size = Configure.LOG_FILE_SIZE;
+
+        if (fs.existsSync(filePath)) {
+            await this.#truncate(filePath, size);
+        }
+        else {
+            // create the empty log file with the permission to read and write on every user.
+            const fh = await fsPromises.open(filePath, 'w');
+            await fh.close();
+            await fsPromises.chmod(filePath, 0o666);
+        }
+
         this.#fileHandle = fs.openSync(Configure.LOG_FILE_PATH, 'as');
     }
 
@@ -95,11 +128,12 @@ class FileLogWriter extends LogWriter {
     }
 
     /**
-     * Truncate the head of file.
+     * Truncate the head of a file.
+     * 
+     * @param {string} filePath the path of the file.
+     * @param {number} size the new size of the file.
      */
-    static async truncate() {
-        const filePath = Configure.LOG_FILE_PATH;
-        const size = Configure.LOG_FILE_SIZE;
+    async #truncate(filePath, size) {
 
         if (!fs.existsSync(filePath)) {
             // return if the file dose not exist.
@@ -112,43 +146,35 @@ class FileLogWriter extends LogWriter {
             fileHandle = await fsPromises.open(filePath, 'r+');
 
             // calculate the starting position to read the file.
-            const stat = await fileHandle.stat()
-            const startPositionOnRead = stat.size - size;
-            if (startPositionOnRead <= 0) {
+            const stat = await fileHandle.stat();
+            const findStart = stat.size - size;
+            if (findStart <= 0) {
                 // return immediately if the size variable is shorter than the file size.
                 return;
             }
 
-            let moving = false;
+            // Find the first record after truncating the log file.
+            const movePosition = await this.#findFirstRecord(fileHandle, findStart);
+            if (movePosition >= 0) {
+                truncatingSize = stat.size - movePosition;
+            }
+
             const buffer = new Uint8Array(16 * 1024); // 16K bytes
-            let readingPosition = startPositionOnRead;
+            let readingPosition = movePosition;
             let writingPosition = 0;
-            // NOSONAR
-            for (;;) {
+            for (;;) { // NOSONAR
                 const { bytesRead } = await fileHandle.read(buffer, 0, buffer.length, readingPosition);
                 if (bytesRead == 0) {
                     // complete moving the logs from the read-position to the top.
                     break;
                 }
-                if (!moving) {
-                    const position = FileLogWriter.#findSingleLog(buffer, bytesRead);
-                    if (position) {
-                        // start moving the finding logs to the top.
-                        readingPosition += position;
-                        truncatingSize = stat.size - readingPosition;
-                        moving = true;
-                        continue;
-                    }
-                }
                 readingPosition += bytesRead;
 
-                if (moving) {
-                    const { bytesWritten } = await fileHandle.write(buffer, 0, bytesRead, writingPosition);
-                    if (bytesWritten != bytesRead) {
-                        throw new Error('Writing to the log file is failed while truncating it.');
-                    }
-                    writingPosition += bytesWritten;
+                const { bytesWritten } = await fileHandle.write(buffer, 0, bytesRead, writingPosition);
+                if (bytesWritten != bytesRead) {
+                    throw new Error('Writing to the log file is failed while truncating it.');
                 }
+                writingPosition += bytesWritten;
             }
         }
         finally{
@@ -158,39 +184,60 @@ class FileLogWriter extends LogWriter {
     }
 
     /**
-     * Find the first single log on the multiple log records.
-     * 
-     * @param {Uint8Array} chunk a raw array of a part of the multiple log records.
-     * @param {number} chunkSize the size of the raw array. 
-     * @returns {number|undefined} found: an negative, zero, or positive value of start-position if found, otherwise undefined.
+     * Find the new starting record on the log file.
+     * @param {fsPromises.FileHandle} fileHandle
+     * @param {number} startPosition the position to start to find the new starting record.
+     * @returns the position of the new starting record, a negative value if not found.
      */
-    static #findSingleLog(chunk, chunkSize) {
-        let found = undefined;
+    async #findFirstRecord(fileHandle, startPosition) {
+        const buffer = new Uint8Array(16 * 1024); // 16K bytes
 
         const utf8Encode = new TextEncoder();
         const sentence = utf8Encode.encode(Configure.LOG_START_SENTENCE);
 
-        let finding = this.#finding;
+        let readingPosition = startPosition;
+        let found = -1;
+        READ_LOOP: for (;;) { // NOSONAR
+            const { bytesRead } = await fileHandle.read(buffer, 0, buffer.length, readingPosition);
+            if (bytesRead == 0) {
+                // found the end of the file instead of the new starting record.
+                break;
+            }
 
-        for (let index = 0; index < chunkSize; index++) {
-            const character = chunk[index];
-            if (character == sentence[finding]) {
-                finding++;
-                if (finding == sentence.length) {
-                    found = index - (sentence.length - 1);
-                    break;
+            for (let index = 0; index < buffer.length - sentence.length; index++) {
+                if (buffer[index] == sentence[0]) {
+                    const candidateView = new Uint8Array(buffer, index, sentence.length);
+                    if (this.#equalsArray(candidateView, sentence)) {
+                        found = index;
+                        break READ_LOOP;
+                    }
                 }
             }
-            else {
-                finding = 0;
-            }
+            readingPosition += bytesRead;
         }
-        this.#finding = finding;
         return found;
     }
 
-    /** @type {number} finding: positive value if under considering, need more following chunks. otherwise zero. */
-    static #finding = 0;
+    /**
+     * Confirm array1 equals arrays. 
+     * @param {Uint8Array} array1 
+     * @param {Uint8Array} array2
+     * @returns {boolean} true if array1 equals array2, false if not equal.
+     */
+    #equalsArray(array1, array2) {
+        if (array1.length != array2.length) {
+            return false;
+        }
+
+        let result = true;
+        for (let index = 0; index < array1.length; index++) {
+            if (array1[index] != array2[index]) {
+                result = false;
+                break;
+            }
+        }
+        return result;
+    }
 }
 
 /**
@@ -266,6 +313,16 @@ export class Logger {
     }
 
     /**
+     * Prepare the console and log writers.
+     */
+    async #prepare() {
+        for (const writer of this.#logWriter) {
+            await writer.prepare();
+        }
+    }
+
+
+    /**
      * Write a message to the console and log writers.
      * @param {string} line 
      */
@@ -279,10 +336,10 @@ export class Logger {
      * Start logging, and Prints the first log message on terminal.
      */
      async startLog() {
-        await FileLogWriter.truncate();
-
         this.#logWriter.push(new ConsoleLogWriter());
         this.#logWriter.push(new FileLogWriter());
+
+        await this.#prepare();
 
         const startMessage = Configure.LOG_START_SENTENCE;
         this.#writeLine(startMessage);

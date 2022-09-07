@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
         {
             "type": "node",
             "request": "attach",
@@ -11,7 +12,7 @@
             "address": "ubuntu.local",
             "port": 9229,
             "localRoot": "${workspaceFolder}",
-            "remoteRoot": "/home/patine/evaluation/elephant-backup"
+            "remoteRoot": "/home/patine/elephant-backup-test/elephant-backup"
         }
     ]
 }
