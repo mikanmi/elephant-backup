@@ -6,16 +6,14 @@
  */
 'use strict'
 
-import test from 'node:test';
-import assert from 'node:assert';
-
 import path from 'node:path';
 import child_process from 'node:child_process';
 
 import packageJson from '../package.json' assert {type: 'json'};
 
+export class Condition {
 
-class Condition {
+    #verbose = false;
 
     temporaryDirectory = './temporary'
     zfsPool1 = 'testpool1';
@@ -25,22 +23,35 @@ class Condition {
     /**
      * Launch a command line.
      * @param {string} commandLine 
+     * @returns result
+     */
+    launch(commandLine) {
+        const result = this.spawnSync(commandLine);
+        return result;
+    }
+
+    /**
+     * Spawn a command line.
+     * @param {string} commandLine 
      * @returns result.
      */
-    spawnSync(commandLine) {
-        console.log(commandLine);
-
+    spawnSync(commandLine, print=this.#verbose) {
+        if (print) {
+            console.log(commandLine);
+        }
         const cmd = 'sudo';
         const tokens = commandLine.split(' ').filter(s => s != '');
         const result = child_process.spawnSync(cmd, tokens);
         if (result.error) {
             throw result.error;
         }
-        if (result.stderr.length != 0) {
-            console.log(result.stderr.toString().trimEnd());
-        }
-        if (result.stdout.length != 0) {
-            console.log(result.stdout.toString().trimEnd());
+        if (print) {
+            if (result.stderr.length != 0) {
+                console.log(result.stderr.toString().trimEnd());
+            }
+            if (result.stdout.length != 0) {
+                console.log(result.stdout.toString().trimEnd());
+            }
         }
 
         return result;
@@ -135,6 +146,14 @@ class Condition {
         this.createFile(file2Byte, 2, `/${this.zfsPool1}`);
     }
 
+    /**
+     * sleep for some milliseconds
+     * @param {number} ms milliseconds
+     */
+    async sleep(ms) {
+        await new Promise(r => setTimeout(r, ms));
+    }
+
     tearDown() {
         this.destroyPool(this.zfsPoolArchive);
         this.destroyPool(this.zfsPool2);
@@ -142,69 +161,20 @@ class Condition {
     }
 }
 
-await test('backup single', async (t) => {
-    t.diagnostic(`backup single diagnostic`);
+export class ToDoMessage {
+    #message = '\n';
 
-    const condition = new Condition();
+    /**
+     * @param {string} message 
+     */
+    add(message) {
+        this.#message += message + '\n';
+    }
 
-    condition.prepareBackup();
-
-    const backupCommand =
-            `${condition.settings.command} backup -a ${condition.zfsPoolArchive} ${condition.zfsPool1}`;
-    condition.spawnSync(backupCommand);
-
-    const diffCommand =
-            `diff -sr /${condition.zfsPool1} /${condition.zfsPoolArchive}/${condition.zfsPool1}`;
-    const diffResult = condition.spawnSync(diffCommand);
-
-    assert.equal(diffResult.status, 0);
-
-    condition.tearDown();
-});
-
-await test('backup multiple', async (t) => {
-    t.diagnostic(`backup multiple diagnostic`);
-
-    const condition = new Condition();
-
-    condition.prepareBackup();
-
-    await t.test('First Time', async (t) => {
-        const backupCommand =
-                `${condition.settings.command} backup -a ${condition.zfsPoolArchive} ${condition.zfsPool1} ${condition.zfsPool2}`;
-        condition.spawnSync(backupCommand);
-
-        const pool1DiffCommand =
-                `diff -sr /${condition.zfsPool1} /${condition.zfsPoolArchive}/${condition.zfsPool1}`;
-        const p1Result = condition.spawnSync(pool1DiffCommand);
-        assert.equal(p1Result.status, 0);
-
-        const pool2DiffCommand =
-                `diff -sr /${condition.zfsPool2} /${condition.zfsPoolArchive}/${condition.zfsPool2}`;
-        const p2Result = condition.spawnSync(pool2DiffCommand);
-        assert.equal(p2Result.status, 0);
-    });
-
-    await t.test('Second Time', async (t) => {
-        await new Promise(r => setTimeout(r, 1000));
-        condition.addFileBackup();
-
-        const backupCommand =
-                `${condition.settings.command} backup -a ${condition.zfsPoolArchive} ${condition.zfsPool1} ${condition.zfsPool2}`;
-        condition.spawnSync(backupCommand);
-
-        const pool1DiffCommand =
-                `diff -sr /${condition.zfsPool1} /${condition.zfsPoolArchive}/${condition.zfsPool1}`;
-        const p1Result = condition.spawnSync(pool1DiffCommand);
-        assert.equal(p1Result.status, 0);
-
-        const pool2DiffCommand =
-                `diff -sr /${condition.zfsPool2} /${condition.zfsPoolArchive}/${condition.zfsPool2}`;
-        const p2Result = condition.spawnSync(pool2DiffCommand);
-        assert.equal(p2Result.status, 0);
-    });
-
-    condition.tearDown();
-
-    // assert.fail('failed');
-});
+    /**
+     * @returns {string} message
+     */
+    toString() {
+        return this.#message;
+    }
+}

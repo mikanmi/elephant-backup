@@ -6,54 +6,66 @@
  */
 'use strict'
 
-import { Options, CommandType } from './Options.js';
+import { CommandLine, CommandType } from './CommandLine.js';
 import { Logger } from './Logger.js';
 import { ZfsFilesystem } from './ZfsFilesystem.js';
 import { ZfsUtilities } from './ZfsUtilities.js';
 
 const logger = Logger.getLogger()
 
-export class Subcommand {
+export class SubCommand {
 
     /**
-     * Create a Subcommand.
-     * @param {CommandType} type a Subcommand type.
-     * @return the Subcommand instance created with the subcommand type.
+     * Create a SubCommand.
+     * @param {CommandType} type a SubCommand type.
+     * @return the SubCommand instance created with the SubCommand type.
      */
     static create(type) {
-        let subcommand;
+        let subCommand;
         switch (type) {
         case CommandType.BACKUP:
-            subcommand = new BackupSubcommand(type);
+            subCommand = new BackupSubCommand(type);
             break;
         case CommandType.SNAPSHOT:
-            subcommand = new SnapshotSubcommand(type);
+            subCommand = new SnapshotSubCommand(type);
             break;
         case CommandType.SYSTEMD_INSTALL:
         case CommandType.SYSTEMD_UNINSTALL:
-                subcommand = new SytemdSubcommand(type);
+                subCommand = new SytemdSubcommand(type);
             break;
         case CommandType.DIFF:
         default: // fail safe
-            subcommand = new DiffSubcommand(type);
+            subCommand = new DiffSubCommand(type);
             break;
         }
-        return subcommand;
+        return subCommand;
     }
 
     commandType;
 
     /**
-     * Create a Subcommand instance.
-     * @param {CommandType} type a Subcommand type.
-     * @return the Subcommand instance created with the subcommand type.
+     * Create a sub-command instance.
+     * @param {CommandType} type a sub-command type.
+     * @return the sub-command instance created with the sub-command type.
      */
     constructor(type) {
         this.commandType = type;
     }
 
     /**
-     * Run the subcommand.
+     * Launch the sub-command.
+     */
+    async launch() {
+        const accessible = await this.accessibleFilesystems();
+        if (!accessible) {
+            logger.exit('Any ZFS filesystems are not accessible.');
+        }
+
+        this.run();
+    }
+
+    /**
+     * Run the sub-command.
      */
     // NOSNOAR
     async run() {
@@ -65,317 +77,358 @@ export class Subcommand {
      * @returns {Promise<boolean>} true if accessible, otherwise false.
      */
     async accessibleFilesystems() {
-        return false;
-    }
+        const filesystems = await ZfsFilesystem.getRoots();
 
-    async checkCondition() {
-        const accessible = await this.accessibleFilesystems();
-        if (!accessible) {
-            logger.exit('Any ZFS filesystems are not accessible.');
-        }
-    }
-}
+        const option = CommandLine.getOption();
+        const archive = option.archive;
+        const zpools = option.arguments;
 
-class BackupSubcommand extends Subcommand {
-    /**
-     * The ZFS filesystems of the command options are accessible or not.
-     * @returns {Promise<boolean>} true if accessible, otherwise false.
-     */
-     async accessibleFilesystems() {
-        const list = await ZfsUtilities.filesystemList();
-
-        const options = Options.getInstance();
-        const archive = options.options.archive;
-        const targets = options.targets;
-
-        // exit if the ZFS filesystems, which a user specifies, do not exist on the machine.
-        if (!list.includes(archive)) {
-            logger.error(`An archive ZFS pool/dataset is not exist: ${archive}`);
-            return false;
-        }
-
-        for (const target of targets) {
-            if (!list.includes(target)) {
-                logger.error(`A primary ZFS pool/dataset is not exist: ${target}`);
+        // exit if the filesystems of 'targets' involve the same filesystem.
+        const sortedZpools = zpools.sort();
+        // notice: the max value of the index decrease 1 on the max value of the element.
+        for (let index = 0; index < sortedZpools.length - 1; index++) {
+            if (sortedZpools[index] === sortedZpools[index + 1]) {
+                logger.error(`A primary ZFS zpool/dataset is duplicated: ${sortedZpools[index]}`);
                 return false;
             }
+        }
+
+        // exit if the filesystems of 'targets' are not exist on the machine.
+        for (const zpool of zpools) {
+            if (!filesystems.some(e => e.name === archive)) {
+                logger.error(`A primary ZFS zpool/dataset is not exist: ${zpool}`);
+                return false;
+            }
+        }
+
+        // exit if 'archive' filesystem is not exist on the machine.
+        if (!filesystems.some(e => e.name === archive)) {
+            logger.error(`An archive ZFS zpool/dataset is not exist: ${archive}`);
+            return false;
         }
 
         return true;
     }
 
     /**
-     * Run the 'backup' subcommand.
+     * Get the latest of common snapshots.
+     * @param {ZfsFilesystem} first 
+     * @param {ZfsFilesystem} second
+     * @returns {Promise<string|null>} the latest of common snapshots
+     */
+    async getlatestOfCommonSnapshots(first, second) {
+        const firstSnapshotList = await first.getSnapshotList();
+        const secondSnapshotList = await second.getSnapshotList();
+
+        // find the latest of common snapshots between the first and the second ZFS filesystem.
+        const latest = firstSnapshotList.findLatest(secondSnapshotList);
+
+        return latest;
+    }
+}
+
+/**
+ * 'backup' sub-command class
+ */
+class BackupSubCommand extends SubCommand {
+    /**
+     * The ZFS filesystems of the command options are accessible or not.
+     * @returns {Promise<boolean>} true if accessible, otherwise false.
+     */
+    async accessibleFilesystems() {
+        const filesystems = await ZfsFilesystem.getRoots();
+
+        const option = CommandLine.getOption();
+        const archive = option.archive;
+
+        const baseResult = await super.accessibleFilesystems();
+        if (!baseResult) {
+            return baseResult;
+        }
+
+        // exit if 'archive' filesystem is not exist on the machine.
+        if (!filesystems.some(e => e.name === archive)) {
+            logger.error(`An archive ZFS zpool/dataset is not exist: ${archive}`);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Run the 'backup' sub-command.
      */
     async run() {
-        logger.debug(`run 'backup' subcommand`);
+        logger.debug(`run 'backup' sub-command`);
 
-        await this.checkCondition();
+        const option = CommandLine.getOption();
+        const roots = await ZfsFilesystem.getRoots();
+        const archive = option.archive;
 
-        const commandLine = Options.getInstance();
-        const targets = commandLine.targets;
-        const archive = commandLine.options.archive;
+        // start the backup process.
+        for (const primary of option.arguments) {
+            // Get the primary filesystem.
+            const primaryFilesystem = roots.find((e) => e.name === primary);
+            if (!primaryFilesystem) {
+                throw new Error(`primaryFilesystem is undefined. primary: ${primary}`);
+            }
+            // Get the archive filesystem.
+            const archiveFilesystem = roots.find((e) => e.name === archive);
+            if (!archiveFilesystem) {
+                throw new Error(`archiveFilesystem is undefined. archive: ${archive}`);
+            }
 
-        // start backup process.
-        for (const target of targets) {
-            await this.#backup(target, archive);
+            await this.#backup(primaryFilesystem, archiveFilesystem);
         }
     }
 
     /**
      * Back up the primary ZFS filesystem to the archive ZFS filesystem.
-     * @param {string} primary a filesystem to backup.
-     * @param {string} archive a filesystem to store.
+     * @param {ZfsFilesystem} primaryFilesystem a filesystem to backup.
+     * @param {ZfsFilesystem} archiveFilesystem a filesystem to store.
      */
-    async #backup(primary, archive) {
-        logger.info(`Start to back up from [${primary}] to [${archive}]`);
-
-        const primaryFilesystem = new ZfsFilesystem(primary);
-        const archiveParentFilesystem = new ZfsFilesystem(archive);
+    async #backup(primaryFilesystem, archiveFilesystem) {
+        logger.info(`Start to back up from [${primaryFilesystem.name}] to [${archiveFilesystem.name}]`);
 
         // create a ZFS dataset from the same name as the primary on the archive filesystem.
-        const archiveFilesystem = await archiveParentFilesystem.create(primaryFilesystem.name);
+        const archiveChildFilesystem = await archiveFilesystem.create(primaryFilesystem.name);
 
         // take the new snapshot now.
         await primaryFilesystem.takeNewSnapshot();
 
-        const prySnapshot = await primaryFilesystem.getSnapshotList();
-        const bakSnapshots = await archiveFilesystem.getSnapshotList();
+        const primarySnapshots = await primaryFilesystem.getSnapshotList();
+        let latestOfCommonSnapshot = 
+                await this.getlatestOfCommonSnapshots(primaryFilesystem, archiveChildFilesystem);
 
-        // find the latest of common snapshots between the primary and the archive.
-        let latestOfCommonSnapshots = prySnapshot.findLatest(bakSnapshots);
-
-        // when the first backup only
-        if (latestOfCommonSnapshots == null) {
-            const earliestPrimarySnapshot = prySnapshot.getEarliest() || 'Unexpected condition';
+        // when the first backup
+        if (latestOfCommonSnapshot == null) {
+            const earliestPrimarySnapshot = primarySnapshots.getEarliest() || 'Unexpected condition';
 
             // estimate the backup size of the earliest snapshot of the primary.
             const firstSize = await primaryFilesystem.estimateBackupSize(earliestPrimarySnapshot);
             logger.print(`The first backup size of ${primaryFilesystem.name}: ${firstSize}`);
             // back up the earliest snapshot of the primary.
-            await primaryFilesystem.backup(archiveFilesystem.name, earliestPrimarySnapshot);
+            await primaryFilesystem.backup(archiveChildFilesystem.name, earliestPrimarySnapshot);
 
-            // and continue to back up the remains of its snapshots.
-            latestOfCommonSnapshots = earliestPrimarySnapshot;
+            // and continue to the following incremental backup.
+            latestOfCommonSnapshot = earliestPrimarySnapshot;
         }
 
         // When the incremental backup
-        const latestSnapshot = prySnapshot.getLatest() ?? 'Unexpected condition';
+        const latestSnapshot = primarySnapshots.getLatest() ?? 'Unexpected condition';
 
-        if (latestOfCommonSnapshots == latestSnapshot) {
+        if (latestOfCommonSnapshot === latestSnapshot) {
             // When the archive is up-to-date, skip the backup process.
             logger.print('Archive is Up-To-Date.');
             return;
         }
 
         // estimate the backup size of the primary of the snapshots between earliest and latest.
-        const incrementalSize = await primaryFilesystem.estimateBackupSize(latestOfCommonSnapshots, latestSnapshot);
+        const incrementalSize = await primaryFilesystem.estimateBackupSize(latestOfCommonSnapshot, latestSnapshot);
         logger.print(`The incremental backup size of ${primaryFilesystem.name}: ${incrementalSize}`);
 
         // back up the primary of the snapshots between earliest and latest.
-        await primaryFilesystem.backup(archiveFilesystem.name, latestOfCommonSnapshots, latestSnapshot);
+        await primaryFilesystem.backup(archiveChildFilesystem.name, latestOfCommonSnapshot, latestSnapshot);
     }
 }
 
-class DiffSubcommand extends Subcommand {
+/**
+ * 'diff' sub-command class
+ */
+class DiffSubCommand extends SubCommand {
     /**
      * The ZFS filesystems of the command options are accessible or not.
      * @returns {Promise<boolean>} true if accessible, otherwise false.
      */
-     async accessibleFilesystems() {
-        const list = await ZfsUtilities.filesystemList();
+    async accessibleFilesystems() {
+        const filesystems = await ZfsFilesystem.getRoots();
 
-        const options = Options.getInstance();
-        const archive = options.options.archive;
-        const targets = options.targets;
+        const option = CommandLine.getOption();
+        const archive = option.archive;
 
-        // exit if the ZFS filesystems, which a user specifies, do not exist on the machine.
-        if (!list.includes(archive)) {
-            logger.error(`An archive ZFS pool/dataset is not exist: ${archive}`);
-            return false;
+        const baseAccessible = await super.accessibleFilesystems();
+        if (!baseAccessible) {
+            return baseAccessible;
         }
 
-        for (const target of targets) {
-            if (!list.includes(target)) {
-                logger.error(`The primary ZFS pool/dataset is not exist: ${target}`);
-                return false;
-            }
+        // exit if 'archive' filesystem is not exist on the machine.
+        if (!filesystems.some(e => e.name === archive)) {
+            logger.error(`An archive ZFS zpool/dataset is not exist: ${archive}`);
+            return false;
         }
 
         return true;
     }
 
     /**
-     * Run the 'diff' subcommand.
+     * Run the 'diff' sub-command.
      */
     async run() {
-        logger.debug(`Run 'diff' subcommand`);
-        const commandLine = Options.getInstance();
+        logger.debug(`Run 'diff' sub-command`);
 
-        await this.checkCondition();
-
-        const targets = commandLine.targets;
-        const archive = commandLine.options.archive;
+        const roots = await ZfsFilesystem.getRoots();
+        const option = CommandLine.getOption();
+        const archive = option.archive;
 
         // start diff process.
-        for (const target of targets) {
-            await this.#diff(target, archive);
+        for (const primary of option.arguments) {
+            // Get the primary filesystem.
+            const primaryFilesystem = roots.find((e) => e.name === primary);
+            if (!primaryFilesystem) {
+                throw new Error(`primaryFilesystem is undefined. primary: ${primary}`);
+            }
+            // Get the archive filesystem.
+            const archiveFilesystem = roots.find((e) => e.name === archive);
+            if (!archiveFilesystem) {
+                throw new Error(`archiveFilesystem is undefined. archive: ${archive}`);
+            }
+
+            await this.#diff(primaryFilesystem, archiveFilesystem);
         }
     }
 
     /**
      * diff the primary ZFS filesystem and the archive ZFS filesystem.
-     * @param {string} primary a ZFS filesystem to backup.
-     * @param {string} archive a ZFS filesystem to store.
+     * @param {ZfsFilesystem} primaryFilesystem a ZFS filesystem to backup.
+     * @param {ZfsFilesystem} archiveFilesystem a ZFS filesystem to store.
      */
-    async #diff(primary, archive) {
-        logger.info(`Start to diff: from [${primary}] to [${archive}]`);
+    async #diff(primaryFilesystem, archiveFilesystem) {
+        logger.info(`Start to diff: from [${primaryFilesystem.name}] to [${archiveFilesystem.name}]`);
 
-        // New the ZFS instance from the primary ZFS filesystem.
-        const primaryFilesystem = new ZfsFilesystem(primary);
-        // Make a ZFS instance from the same name as the primary on the archive ZFS filesystem.
-        const archiveParentFilesystem = new ZfsFilesystem(archive);
+        // Open the ZFS dataset from the same name as the primary filesystem.
+        const archiveDataset = await archiveFilesystem.open(primaryFilesystem.name);
+        const exist = await archiveDataset.exist();
+        if (!exist) {
+            logger.print(`${primaryFilesystem.name} is not archived on ${archiveFilesystem.name} yet.`);
+            return;
+        }
 
-        // print the name of the primary and archive ZFS filesystems.
-        const archiveFilesystem = archiveParentFilesystem.open(primaryFilesystem.name);
-        logger.print(`diff ${primaryFilesystem.name} and ${archiveFilesystem.name} `);
+        logger.print(`diff ${primaryFilesystem.name} and ${archiveDataset.name} `);
 
         let message = '';
         // Get all of the ZFS datasets contained in the primary ZFS filesystem.
-        const primaryDatasetFilesystems = await primaryFilesystem.openRecursively();
-        for (const primaryDatasetFilesystem of primaryDatasetFilesystems) {
-            const archiveDatasetFilesystem = archiveParentFilesystem.open(primaryDatasetFilesystem.name);            
+        const primaryDatasets = await primaryFilesystem.openRecursively();
+        for (const primaryDataset of primaryDatasets) {
+            const archiveDatasetChild = await archiveFilesystem.open(primaryDataset.name);
+            const exist = await archiveDatasetChild.exist();
+            if (!exist) {
+                // Found not-archived dataset and skip the not-archived dataset.
+                // the parent already have printed the not-archived dataset as added on the parent's diff. 
+                logger.info(`${primaryDataset.name} is not archived on ${archiveDatasetChild.name} yet.`);
+                continue;
+            }
 
-            const primarySnapshots = await primaryDatasetFilesystem.getSnapshotList();
-            const archiveSnapshots = await archiveDatasetFilesystem.getSnapshotList();
-    
-            // Find the latest of common snapshots between the primary and the archive.
-            const latestOfCommonSnapshots = primarySnapshots.findLatest(archiveSnapshots) || 'Unexpected Snapshot';
+            const latestOfCommonSnapshot =
+                    await this.getlatestOfCommonSnapshots(primaryDataset, archiveDatasetChild);
+            if (!latestOfCommonSnapshot) {
+                logger.print(`${primaryFilesystem.name} is not archived on ${archiveDataset} yet.`);
+                return;
+            }
 
-            message += await primaryDatasetFilesystem.diff(latestOfCommonSnapshots);
+            message += await primaryDataset.diff(latestOfCommonSnapshot);
         }
 
         // print no difference of the primary and the archive if no differences.
         if (message == '') {
-            logger.print(`${primaryFilesystem.name} and ${archiveFilesystem.name} are no differences`);
+            logger.print(`${primaryFilesystem.name} and ${archiveDataset.name} are no differences`);
         }
     }
 }
 
-class SnapshotSubcommand extends Subcommand {
+/**
+ * 'snapshot' sub-command class
+ */
+class SnapshotSubCommand extends SubCommand {
     /**
      * The ZFS filesystems of the command options are accessible or not.
      * @returns {Promise<boolean>} true if accessible, otherwise false.
      */
      async accessibleFilesystems() {
+        // Later, confirm argument ZFS filesystem exist or not.
         return true;
     }
 
     /**
-     * Run the 'snapshot' subcommand.
+     * Run the 'snapshot' sub-command.
      */
     async run() {
-        logger.debug(`Run 'snapshot' subcommand`);
+        logger.debug(`Run 'snapshot' sub-command`);
 
-        await this.checkCondition();
+        const roots = await ZfsFilesystem.getRoots();
+        const option = CommandLine.getOption();
 
-        const list = await ZfsUtilities.filesystemList();
+        const takeOrShowFunction =
+                option.list ? this.#showSnapshots : this.#takeSnapshot;
 
-        const options = Options.getInstance();
-        const targets = options.targets;
-
-        const showOrTakeFunction = options.options.list ? this.#showSnapshots : this.#takeSnapshot;
-
-        // start takeing a snapshot process.
-        for (const target of targets) {
-            if (list.includes(target)) {
-                await showOrTakeFunction(target);
+        // start the process to take a snapshot.
+        for (const filesystemName of option.arguments) {
+            // Get the filesystem.
+            const filesystem = roots.find((e) => e.name === filesystemName);
+            if (filesystem) {
+                await takeOrShowFunction(filesystem);
             }
             else {
-                logger.warn(`A ZFS pool/dataset to taking a snapshot is not exist: ${target}`);
-                logger.warn(`Skipping a snapshot on the ZFS pool/dataset: ${target}`);
+                logger.warn(`A ZFS pool/dataset to taking a snapshot is not exist: ${filesystemName}`);
+                logger.warn(`Skipping a snapshot on the ZFS pool/dataset: ${filesystemName}`);
             }
         }
     }
 
     /**
      * Take a snapshot on the ZFS filesystem.
-     * @param {string} filesystem a ZFS filesystem which you take on.
+     * @param {ZfsFilesystem} filesystem a ZFS filesystem on which you take a snapshot.
      */
     async #takeSnapshot(filesystem) {
-        logger.info(`Start to snapshot: on [${filesystem}]`);
-
-        // New the ZFS instance from a ZFS filesystem.
-        const zfsFilesystem = new ZfsFilesystem(filesystem);
+        logger.info(`Start to snapshot: on [${filesystem.name}]`);
 
         // take a new snapshot.
-        await zfsFilesystem.takeNewSnapshot();
+        await filesystem.takeNewSnapshot();
 
         // purge some of oldest snapshots.
-        await zfsFilesystem.purgeSnapshots();
+        await filesystem.purgeSnapshots();
     }
 
     /**
-     * Show the Elephant Backup snapshots.
-     * @param {string} filesystem An array of ZFS filesystems which we show snapshots of.
+     * Show the snapshots on the ZFS filesystem.
+     * @param {ZfsFilesystem} filesystem a ZFS filesystem on that you show snapshots.
      */
     async #showSnapshots(filesystem) {
-        logger.info(`Start to show snapshots: on [${filesystem}]`);
+        logger.info(`Start to show snapshots: on [${filesystem.name}]`);
 
-        // New the ZFS instance from a ZFS filesystem.
-        const zfsFilesystem = new ZfsFilesystem(filesystem);
-        const snapshotList = await zfsFilesystem.getSnapshotList();
+        const snapshotList = await filesystem.getSnapshotList();
         const snapshotsByGeneration = await snapshotList.getSnapshotsByGenerations();
 
-        logger.print(`'${zfsFilesystem.name}' has the following snapshots:`);
+        logger.print(`'${filesystem.name}' has the following snapshots:`);
         logger.print(snapshotsByGeneration);
     }
 }
 
-class SytemdSubcommand extends Subcommand {
+class SytemdSubcommand extends SubCommand {
     /**
-     * The ZFS filesystems of the command options are accessible or exit.
-     * @returns true if accessible, otherwise exit.
+     * The ZFS filesystems of the command options are accessible or not.
+     * @returns {Promise<boolean>} true if accessible, otherwise false.
      */
      async accessibleFilesystems() {
 
-        switch (this.commandType) {
-        case CommandType.SYSTEMD_INSTALL:
-            // nothing to do.
-            break;
-        case CommandType.SYSTEMD_UNINSTALL:
-            // success always if command type is systemd uninstall.
+        if (this.commandType == CommandType.SYSTEMD_UNINSTALL) {
+            // always success if the 'systemd-uninstall' sub-command.
             return true;
         }
 
-        // exit if the ZFS filesystems, which a user specifies, do not exist on the machine.
-        const list = await ZfsUtilities.filesystemList();
+        const accessible = await super.accessibleFilesystems();
 
-        const options = Options.getInstance();
-        const targets = options.targets;
-
-        for (const target of targets) {
-            if (!list.includes(target)) {
-                logger.error(`A ZFS pool/dataset to run auto-snapshot is not exist: ${target}`);
-                return false;
-            }
-        }
-        return true;
+        return accessible;
     }
 
     /**
-     * Run the 'systemd' subcommand.
+     * Run the 'systemd' sub-command.
      */
      async run() {
-        logger.debug(`Run 'systemd' subcommand`);
+        logger.debug(`Run 'systemd' sub-command`);
 
-        await this.checkCondition();
-
-        const options = Options.getInstance();
-        const targets = options.targets;
-
+        const option = CommandLine.getOption();
         const enable = this.commandType == CommandType.SYSTEMD_INSTALL;
 
-        await ZfsUtilities.enableSystemd(enable, targets);
+        await ZfsUtilities.enableSystemd(enable, option.arguments);
     }
 }

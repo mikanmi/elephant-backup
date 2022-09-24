@@ -8,7 +8,7 @@
 
 import { Configure } from "./Configure.js";
 import { Logger } from "./Logger.js";
-import { Options } from "./Options.js";
+import { CommandLine } from "./CommandLine.js";
 import { Snapshot } from "./Snapshot.js";
 import { ZfsUtilities } from "./ZfsUtilities.js";
 
@@ -130,12 +130,32 @@ export class SnapshotList {
 
 export class ZfsFilesystem {
 
-    #name = 'Unexpected filesystem';
+    /** @type {string[]} */
+    static #filesystemList = ['Unexpected filesystems'];
+
+    /** @type {string} */
+    #name;
 
     /** @type {string|null} */
     #newSnapshot = null;
 
     /**
+     * Construct a ZfsFilesystem with the filesystem variable.
+     * @returns {Promise<ZfsFilesystem[]>} filesystem a ZFS filesystem.
+     */
+    static async getRoots() {
+        const rootList = await ZfsUtilities.rootFilesystemList();
+        const zfsFilesystems = 
+                rootList.map((filesystem) => new ZfsFilesystem(filesystem));
+
+        // Get all of the filesystem on this machine.
+        ZfsFilesystem.#filesystemList = await ZfsUtilities.filesystemList();
+
+        return zfsFilesystems;
+    }
+
+    /**
+     * I designed this constructor with PRIVATE.
      * Construct a ZfsFilesystem with the filesystem variable.
      * @param {string} filesystem a ZFS filesystem.
      */
@@ -149,6 +169,9 @@ export class ZfsFilesystem {
      * @returns the created ZFS dataset.
      */
     async create(dataset) {
+        if (!this.exist()) {
+            throw new Error(`ZFS filesystem is not exist: ${this.#name}`);
+        }
         await ZfsUtilities.createZfsDataset(dataset, this.#name);
         return new ZfsFilesystem(`${this.#name}/${dataset}`);
     }
@@ -156,10 +179,22 @@ export class ZfsFilesystem {
     /**
      * Open the ZFS dataset on the filesystem.
      * @param {string} dataset the name of a ZFS dataset to open.
-     * @returns {ZfsFilesystem} a ZfsFilesystem instance associated with the dataset.
+     * @returns {Promise<ZfsFilesystem>} a ZfsFilesystem instance associated with the dataset.
      */
-     open(dataset) {
+    async open(dataset) {
+        if (!this.exist()) {
+            throw new Error(`ZFS filesystem is not exist: ${this.#name}`);
+        }
         return new ZfsFilesystem(`${this.#name}/${dataset}`);
+    }
+
+    /**
+     * Confirm a ZFS filesystem exists or not.
+     * @returns {Promise<boolean>} true if exist, false if not.
+     */
+    async exist() {
+        const included = ZfsFilesystem.#filesystemList.includes(this.name);
+        return included;
     }
 
     /**
@@ -268,8 +303,9 @@ export class ZfsFilesystem {
      * @return {Promise<SnapshotList>} the list of the snapshots on this filesystem.
      */
      async getSnapshotList() {
-        const options = Options.getInstance();
-        const optionalSnapshot = options.options.dryRun ? this.#newSnapshot : null;
+        const option = CommandLine.getOption();
+
+        const optionalSnapshot = option.dryRun ? this.#newSnapshot : null;
         const snapshots = await ZfsUtilities.snapshotList(this.#name, optionalSnapshot);
         const list = new SnapshotList(snapshots);
 

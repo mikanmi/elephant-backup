@@ -9,7 +9,7 @@
 import path from 'node:path';
 
 import { Command } from './Command.js'
-import { Options } from './Options.js';
+import { CommandLine } from './CommandLine.js';
 import { Configure } from './Configure.js';
 import { Logger } from './Logger.js';
 
@@ -19,6 +19,11 @@ const logger = Logger.getLogger();
  * OpenZFS commands
  */
 class ZfsCommands {
+    /**
+     * @types {string} The command line that shows ZFS zpool on this machine.
+     */
+    static ZPOOL_LIST_ZPOOL = 'zpool list -H -o name';
+
     /**
      * @types {string} The command line that shows ZFS filesystems on this machine.
      */
@@ -143,11 +148,11 @@ export class ZfsUtilities {
      * @param {string} last the last snapshot on the ZFS filesystem.
      */
     static async sendAndReceiveZfsFilesystem(archive, filesystem, first, last = '') {
+        const option = CommandLine.getOption();
         const intermediate = last == '' ? '' : '-I';
 
-        const commandLine = Options.getInstance();
-        const dryRun = commandLine.options.dryRun ? '-n' : '';
-        const verbose = commandLine.options.verbose ? '-v' : '';
+        const dryRun = option.dryRun ? '-n' : '';
+        const verbose = option.verbose ? '-v' : '';
 
         const firstSnapshot = `${filesystem}@${first}`;
         const lastSnapshot = last == '' ? last : `${filesystem}@${last}`;
@@ -191,15 +196,30 @@ export class ZfsUtilities {
     }
 
     /**
-     * Get the child ZFS filesystems recursively on a ZFS filesystems.
-     * @param {string} filesystem a ZFS filesystem that has children. If the empty string(''), return root ZFS filesystems.
-     * @param {boolean} recursive true if get the children recursively, false if get only the children.
-     * @returns {Promise<string[]>} the list of the ZFS filesystems recursively on the ZFS filesystems.
+     * Get the ZFS zpools on the this machine.
+     * @returns {Promise<string[]>} the ZFS zpool list on this machine.
      */
-     static async filesystemList(filesystem='', recursive=false) {
-        const recursiveOption = recursive ? '-r' : '';
-        const command =
-                new Command(`${ZfsCommands.ZFS_LIST_FILESYSTEM} ${recursiveOption} ${filesystem}`);
+    static async rootFilesystemList() {
+        const command = new Command(ZfsCommands.ZPOOL_LIST_ZPOOL);
+        const result = await command.spawnAsync();
+
+        const filesystems = result === '' ? [] : result.split('\n');
+
+        logger.debug(`ZFS filesystems: ${filesystems}`);
+        return filesystems;
+    }
+
+    /**
+     * Get the child ZFS filesystems recursively and oneself on a ZFS filesystems.
+     * @param {string} filesystem a ZFS filesystem to get child ZFS filesystems.
+     *          If empty('') string, get all of the filesystems. 
+     * @returns {Promise<string[]>} the ZFS filesystems list of children on the ZFS filesystems.
+     */
+     static async filesystemList(filesystem='') {
+        const recursive = filesystem === '' ? '' : '-r';
+        const commandList = `${ZfsCommands.ZFS_LIST_FILESYSTEM} ${recursive} ${filesystem}`;
+
+        const command = new Command(commandList);
         const result = await command.spawnAsync();
 
         const filesystems = result === '' ? [] : result.split('\n');

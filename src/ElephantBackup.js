@@ -7,8 +7,8 @@
  "use strict"
 
 import { Logger, LogLevel } from './Logger.js';
-import { Options } from './Options.js';
-import { Subcommand } from './Subcommand.js';
+import { CommandLine } from './CommandLine.js';
+import { SubCommand } from './Subcommand.js';
 
 import packageJson from '../package.json' assert {type: 'json'};
 
@@ -17,9 +17,9 @@ const logger = Logger.getLogger();
 export class ElephantBackup {
 
     constructor() {
-        const options = Options.getInstance();
-        options.configure();
-        options.parse();
+        const commandLine = CommandLine.getInstance();
+        commandLine.configure();
+        commandLine.parse();
     }
 
     /**
@@ -44,24 +44,24 @@ export class ElephantBackup {
             process.exit();
         }
 
-        const options = Options.getInstance();
-        if (options.options.verbose) {
+        const option = CommandLine.getOption();
+        if (option.verbose) {
             logger.setLogLevel(LogLevel.DEBUG);
         }
-        if (options.options.develop) {
+        if (option.develop) {
             logger.setLogLevel(LogLevel.DEVL);
         }
 
         // Start logging, and print the starting message.
-        logger.startLog();
+        await logger.startLog();
         logger.debug(process.argv);
     
-        logger.info(`Subcommand: ${options.subcommand}`);
-        logger.info(`options => `);
-        logger.info(options.options);
-        logger.info(`targets: ${options.targets}`);
+        logger.info(`Subcommand: ${option.subCommand}`);
+        logger.info(`Arguments: ${option.arguments}`);
+        logger.info(`Option => `);
+        logger.info(option);
 
-        const subcommand = Subcommand.create(options.subcommand);
+        const subcommand = SubCommand.create(option.subCommand);
         await subcommand.run();
     }
 

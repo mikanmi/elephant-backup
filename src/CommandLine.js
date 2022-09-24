@@ -23,30 +23,91 @@ export class CommandType {
  * @typedef {{archive: 'unexpected', dryRun: false, verbose: false, develop: false, list: false}} OptionList
  */
 
-export class Options {
+export class CommandOption {
 
-    static #thisInstance = new Options();
+    /**
+     * Construct a Command Option instance.
+     * @param {string} subcmd the sub-command of this application.
+     * @param {string[]} args the arguments of this sub-command.
+     * @param {any} opts the option parameters of this sub-command. 
+     */
+    constructor(subcmd, args, opts) {
+        this.#subCommand_ = subcmd;
+        this.#arguments_ = args;
+        this.#archive_ = opts.archive;
+        this.#dryRun_ = opts.dryRun;
+        this.#verbose_ = opts.verbose;
+        this.#develop_ = opts.develop;
+        this.#list_ = opts.list;
+    }
+
+    /** @type {string} */
+    #subCommand_;
+    get subCommand() {
+        return this.#subCommand_;
+    }
+    /** @type {string[]} */
+    #arguments_;
+    get arguments() {
+        return this.#arguments_;
+    }
+    /** @type {string} */
+    #archive_;
+    get archive() {
+        return this.#archive_;
+    }
+    /** @type {boolean} */
+    #dryRun_;
+    get dryRun() {
+        return this.#dryRun_;
+    }
+    /** @type {boolean} */
+    #verbose_;
+    get verbose() {
+        return this.#verbose_;
+    }
+    /** @type {string} */
+    #develop_;
+    get develop() {
+        return this.#develop_;
+    }
+    /** @type {string} */
+    #list_;
+    get list() {
+        return this.#list_;
+    }
+}
+
+export class CommandLine {
+    /** @type {CommandLine} */
+    static #thisInstance = new CommandLine();
+
+    /** @type {CommandOption} */
+    #option = new CommandOption('dummy sub-command', ['dummy arguments'], []);
 
     #program = new Command();
 
     #subCommand = this.#program;
+    #arguments = ['unexpected arguments'];
 
-    #targets = [''];
-    /** @type {OptionList} */
-    #options = 
-            {archive: 'unexpected', dryRun: false, verbose: false, develop: false, list: false};
-
+    /**
+     * Get the singleton instance.
+     * @returns {CommandLine}
+     */
     static getInstance() {
         return this.#thisInstance;
+    }
+
+    static getOption() {
+        const instance = CommandLine.getInstance();
+        return instance.#option;
     }
 
     /**
      * Configure the command line options.
      */
     configure() {
-        const program = this.#program
-
-        program
+        this.#program
             .name(packageJson.name)
             .description('Elephant Backup is a backup/archive program that raw-copies your ZFS filesystems to another.')
             .version(packageJson.version);
@@ -64,7 +125,11 @@ export class Options {
     parse() {
         this.#program.parse();
 
-        this.#options = this.#subCommand.opts();
+        const subCommand = this.#program.args[0];
+        const args = this.#arguments;
+        const opts = this.#subCommand.opts();
+
+        this.#option = new CommandOption(subCommand, args, opts);
     }
 
     /**
@@ -72,25 +137,9 @@ export class Options {
      * @returns {string}
      */
     get subcommand() {
+        // TODO: the class hold arg[0] instead of program.
         return this.#program.args[0];
     }
-
-    /**
-     * Get the command targets.
-     * @returns {string[]}
-     */
-    get targets() {
-        return this.#targets;
-    }
-
-    /**
-     * Get the command options.
-     * @returns {OptionList}
-     */
-    get options() {
-        return this.#options;
-    }
-
 
     /**
      * @param {string} commandType
@@ -142,7 +191,7 @@ export class Options {
                     'the names of one or more primary ZFS filesystems.')
             .action((pools, _, command) => {
                 this.#subCommand = command;
-                this.#targets = pools;
+                this.#arguments = pools;
             });
             break;
         case CommandType.SYSTEMD_UNINSTALL:

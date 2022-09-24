@@ -9,7 +9,7 @@
 import child_process from 'node:child_process';
 import stream from 'node:stream'; // NOSONAR
 import { Logger } from './Logger.js';
-import { Options } from './Options.js';
+import { CommandLine } from './CommandLine.js';
 
 const logger = Logger.getLogger();
 
@@ -56,9 +56,9 @@ export class Command {
      * @return {Promise<string>} The result of spawn the command line.
      */
      async spawnIfNoDryRunAsync(stdin = null) {
-        const commandLine = Options.getInstance();
+        const option = CommandLine.getOption();
 
-        const result = commandLine.options.dryRun ?
+        const result = option.dryRun ?
              await this.#spawnDryRunAsync(stdin) :
              await this.spawnAsync(stdin);
         return result;
