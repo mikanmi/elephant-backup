@@ -11,33 +11,42 @@ import assert from 'node:assert';
 
 import { Condition, ToDoMessage } from './Condition.js';
 
+/**
+ * 
+ * @param {ToDoMessage} message 
+ * @param {string} zpool 
+ * @param {Condition} condition
+ */
+async function verifyResult(message, zpool, condition) {
+    const diffCommand =
+            `diff -sr /${zpool} /${condition.zfsPoolArchive}/${zpool}`;
+
+    message.add(`Confirm: the 'diff' command prints no differences.\n`);
+    const diffResult = condition.spawnSync(diffCommand);
+    assert.equal(diffResult.status, 0);
+    message.add(diffResult.stdout.toString());
+}
+
 test('Backup one ZFS filesystem', async (t) => {
     t.diagnostic('backup single diagnostic');
 
+    // setup
     const condition = new Condition();
+    condition.prepareBackup();
 
     await t.test('One filesystem', async (t) => {
         const message = new ToDoMessage();
 
-        // setup
-        condition.prepareBackup();
-
-        // do test
+        // do the test
         const backupCommand =
                 `${condition.settings.command} backup -a ${condition.zfsPoolArchive} ${condition.zfsPool1}`;
         const result = condition.launch(backupCommand);
         await condition.sleep(1000);
         message.add(result.stdout.toString());
 
-        // verify result
-        message.add(`Confirm: the 'diff' command prints no differences.\n`);
-        const diffCommand =
-                `diff -sr /${condition.zfsPool1} /${condition.zfsPoolArchive}/${condition.zfsPool1}`;
-        const diffResult = condition.spawnSync(diffCommand);
-        message.add(diffResult.stdout.toString());
-
+        // verify the result
+        await verifyResult(message, condition.zfsPool1, condition);
         t.todo(message.toString());
-        assert.equal(diffResult.status, 0);
     });
 
     // tear down
@@ -47,44 +56,33 @@ test('Backup one ZFS filesystem', async (t) => {
 await test('Backup two ZFS filesystem', async (t) => {
     t.diagnostic(`Backup two ZFS filesystem diagnostic`);
 
-    const condition = new Condition();
-
     // setup
+    const condition = new Condition();
     condition.prepareBackup();
 
     await t.test('First Time', async (t) => {
         const message = new ToDoMessage();
 
-        // do test
+        // do the test
         const backupCommand =
                 `${condition.settings.command} backup -a ${condition.zfsPoolArchive} ${condition.zfsPool1} ${condition.zfsPool2}`;
         const result = condition.launch(backupCommand);
         await condition.sleep(1000);
         message.add(result.stdout.toString());
 
-        // verify result
-        message.add(`Confirm: the 'diff' command prints no differences.\n`);
-        const pool1DiffCommand =
-                `diff -sr /${condition.zfsPool1} /${condition.zfsPoolArchive}/${condition.zfsPool1}`;
-        const p1Result = condition.spawnSync(pool1DiffCommand);
-        assert.equal(p1Result.status, 0);
-        message.add(p1Result.stdout.toString());
-
-        message.add(`Confirm: the 'diff' command prints no differences.\n`);
-        const pool2DiffCommand =
-                `diff -sr /${condition.zfsPool2} /${condition.zfsPoolArchive}/${condition.zfsPool2}`;
-        const p2Result = condition.spawnSync(pool2DiffCommand);
-        assert.equal(p2Result.status, 0);
-        message.add(p2Result.stdout.toString());
-
+        // verify the result
+        await verifyResult(message, condition.zfsPool1, condition);
+        await verifyResult(message, condition.zfsPool2, condition);
         t.todo(message.toString());
     });
 
     await t.test('Second Time', async (t) => {
         const message = new ToDoMessage();
+
+        // prepare the test
         condition.addFileBackup();
 
-        // do test
+        // do the test
         const backupCommand =
                 `${condition.settings.command} backup -a ${condition.zfsPoolArchive} ${condition.zfsPool1} ${condition.zfsPool2}`;
         const result = condition.launch(backupCommand);
@@ -92,20 +90,8 @@ await test('Backup two ZFS filesystem', async (t) => {
         message.add(result.stdout.toString());
 
         // verify result
-        message.add(`Confirm: the 'diff' command prints no differences.\n`);
-        const pool1DiffCommand =
-                `diff -sr /${condition.zfsPool1} /${condition.zfsPoolArchive}/${condition.zfsPool1}`;
-        const p1Result = condition.spawnSync(pool1DiffCommand);
-        assert.equal(p1Result.status, 0);
-        message.add(p1Result.stdout.toString());
-
-        message.add(`Confirm: the 'diff' command prints no differences.\n`);
-        const pool2DiffCommand =
-                `diff -sr /${condition.zfsPool2} /${condition.zfsPoolArchive}/${condition.zfsPool2}`;
-        const p2Result = condition.spawnSync(pool2DiffCommand);
-        assert.equal(p2Result.status, 0);
-        message.add(p2Result.stdout.toString());
-
+        await verifyResult(message, condition.zfsPool1, condition);
+        await verifyResult(message, condition.zfsPool2, condition);
         t.todo(message.toString());
     });
 
