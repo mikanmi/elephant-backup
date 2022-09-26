@@ -2,7 +2,7 @@
   "private": false,
   "displayName": "Elephant Backup",
   "name": "elephant-backup",
-  "version": "2.1.1",
+  "version": "3.0.0",
   "bin": "src/main.js",
   "description": "Elephant Backup is an easy backup CLI to archive any number of ZFS filesystems containing lots of snapshots to another ZFS filesystem.",
   "license": "BSD 2-Clause",
@@ -33,7 +33,7 @@
     "test": "node --test test/"
   },
   "dependencies": {
-    "commander": "^9.3.0"
+    "commander": "^9.4.0"
   },
   "devDependencies": {
     "node": "^18.9.0",

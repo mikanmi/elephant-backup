@@ -17,7 +17,7 @@ Elephant Backup archives any number of ZFS filesystems containing lots of snapsh
 
 ## Install
 
-1. Install Elephant Backup
+### Install Elephant Backup
 
    ```bash
    npm install elephant-backup
@@ -26,6 +26,7 @@ Elephant Backup archives any number of ZFS filesystems containing lots of snapsh
 Note:
 
 Install `npm` with the `apt` package manager if `npm` does not exist on Ubuntu.
+
 Install `node` with `npm` and **reboot** after installing `npm`.
 
    ```bash
@@ -61,19 +62,19 @@ Take snapshots automatically with the `systemd` auto-launcher.
 elephant-backup systemd-install <primary ZFS filesystem...>
 ```
 
-- _\<archive filesystem\>_: the name of the ZFS filesystem that stores the primary ZFS filesystems.
+- _\<primary ZFS filesystem\>_: the name of the ZFS filesystem that stores the primary ZFS filesystems.
 
-e.g., Take automatically snapshots two of the primary ZFS pools named _root.pool_ and _storage.pool_.
+e.g., you take automatically snapshots named _root.pool_ and _storage.pool_.
 
-```bash
-sudo elephant-backup systemd-install root.pool storage.pool
-```
+- Start to take snapshots automatically.
+   ```bash
+   sudo elephant-backup systemd-install root.pool storage.pool
+   ```
 
-Stop to take snapshots automatically.
-
-```bash
-sudo elephant-backup systemd-uninstall
-```
+- Stop to take snapshots automatically.
+   ```bash
+   sudo elephant-backup systemd-uninstall
+   ```
 
 ### Other Usages
 
@@ -126,11 +127,11 @@ We estimate the volume size of the ZFS pool from the _USED_ property of to be pu
 
 ### Development version
 
-Move the current directory and do below.
-
 1. Install
 
    - Install the development version from a local directory.
+
+      Move the directory containing Elephant Backup, and install it.
 
       ```bash
       cd working/elephant-backup
@@ -151,35 +152,46 @@ Move the current directory and do below.
 
 ### Debug
 
-1. Run Elephant Backup with the debugging flag on node.js on remote machine named _ubuntu.local_.
+Debug Elephant Backup with the remote debug.
+
+e.g.,
+
+- Remote Machine Name: _ubuntu.local_
+- Elephant Backup Path on Remote: _/home/patine/working/elephant-backup_
+
+The remote debug procedure:
+
+1. Debug Machine: Change `remoteRoot` on the _.vscode/launch.json_ file.
+
+   ```json
+   "remoteRoot": "/home/patine/working/elephant-backup"
+   ```
+
+1. Remote Machine: Run Elephant Backup with the debugging flag on node.js on the .
 
    ```bash
    cd /home/patine/working/elephant-backup
    sudo node --inspect-brk=ubuntu.local src/main.js --help
    ```
 
-1. Change `remoteRoot` on the _.vscode/launch.json_ file.
+1. Debug Machine: Select 'Attach to remote' on the Visual Studio Code.
 
-   ```json
-   "remoteRoot": "/home/patine/working/elephant-backup"
-   ```
+### Test
 
-1. Run 'Attach to remote' on the Visual Studio Code.
+Setup the test environment on your machine.
 
-### Nodejs
-
-Install node.js on Ubuntu Linux.
+1. Move the current directory to _elephant-backup_.
+1. Install `node.js` with version 18.0.0 or higher.
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-sudo apt-get install -y nodejs
+npm install node@18.9.0
 ```
 
-Uninstall node.js on Ubuntu Linux.
+Run the test.
+
+1. Move the current directory to _elephant-backup_.
+1. Run the test on the test environment.
 
 ```bash
-sudo apt-get purge nodejs
-sudo rm -r /etc/apt/sources.list.d/nodesource.list
+npx node --test
 ```
-
-See [Installing Node.js via package manager](https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions) on other platforms.
