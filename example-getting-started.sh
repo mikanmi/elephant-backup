@@ -2,7 +2,7 @@
 
 # the primary and archive filesystems
 PRIMARIES="root.pool storage.pool"
-ARCHIVE="backup.pool"
+ARCHIVE="archive.pool"
 
 echo 'Import the archive filesystem on attached external storage.'
 echo '====================>'
@@ -36,4 +36,3 @@ do
 rsync -n -carv --delete /${PRIMARY}/ /${ARCHIVE}/${PRIMARY}/
 done
 echo '\n'
-
