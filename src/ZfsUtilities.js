@@ -161,7 +161,9 @@ export class ZfsUtilities {
         // Building the send command of the filesystem.
         const stderrHandler = (/** @type {any} */ data) => {
             const dataString = data.toString().trimEnd();
-            // print the child's stderr immediately on the application stdout.
+            // `zfs send` with `-v` option prints the sending progress on the stderr.
+            // Elephant Backup piped stderr to its own stdout.
+            // Then Elephant Backup prints the sending progress on the stdout.
             logger.print(`${dataString}`);
         };
 
