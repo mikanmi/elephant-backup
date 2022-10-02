@@ -45,6 +45,7 @@ export class Command {
         this.setStdErrHandler((data) => {
             // print stderr using the logger if printStderr is 'logger'.
             const dataString = data.toString().trimEnd();
+
             // print the child's stderr immediately on the application stdout.
             logger.error(`${dataString}`);
         });

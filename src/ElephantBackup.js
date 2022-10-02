@@ -8,7 +8,7 @@
 
 import { Logger, LogLevel } from './Logger.js';
 import { CommandLine } from './CommandLine.js';
-import { SubCommand } from './Subcommand.js';
+import { SubCommand } from './SubCommand.js';
 
 import packageJson from '../package.json' assert {type: 'json'};
 
