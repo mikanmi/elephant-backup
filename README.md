@@ -79,8 +79,8 @@ e.g., automatically take snapshots named _root.pool_ and _storage.pool_.
 
 ### Other Usages
 
-Run the `elephant-backup` command with the `-h` option.  
-Elephant Backup has three sub-commands and two auto-snapshot above.  
+Find three sub-commands and two auto-snapshot by running the `elephant-backup` command with the `-h` option.
+
 See more details using the `-h` option with sub-command.
 
 ```bash
