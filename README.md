@@ -8,12 +8,14 @@ Elephant Backup archives any number of ZFS filesystems containing lots of snapsh
 
 - Archive your ZFS filesystems staying snapshots as it is.
 - Supports the incremental backup from the previous one.
-- Show the difference between the current backup and the previous one.
+- Show the difference between the current archive and the previous one.
+- Take a one-shot snapshot and snapshots automatically every hour.
 
-## Official Website
+## Website
 
-- Release Site: <https://www.npmjs.com/package/elephant-backup>
-- Development Site: <https://github.com/patineboot/elephant-backup>
+Development Site: <https://github.com/patineboot/elephant-backup>
+
+Released Elephant Backup with `npm` : <https://www.npmjs.com/package/elephant-backup>
 
 ## Install
 
@@ -25,8 +27,7 @@ Elephant Backup archives any number of ZFS filesystems containing lots of snapsh
 
 Note:
 
-Install `npm` with the `apt` package manager if `npm` does not exist on Ubuntu.
-
+Install `npm` with the `apt` package manager if `npm` does not exist on Ubuntu.  
 Install `node` with `npm` and **reboot** after installing `npm`.
 
    ```bash
@@ -39,39 +40,39 @@ Install `node` with `npm` and **reboot** after installing `npm`.
 
 ### Quick Start
 
-Back up your ZFS filesystems(ZFS pool or ZFS dataset) with Elephant Backup:
+Archive ZFS filesystems, meaning ZFS pool or ZFS dataset, with the command line:
 
 ```bash
-elephant-backup backup -a <archive ZFS filesystem> <primary ZFS filesystem...>
+elephant-backup backup -a <archive filesystem> <primary filesystem...>
 ```
 
-- _\<archive filesystem\>_: the name of the ZFS filesystem that stores the primary ZFS filesystems.
-- _\<original filesystem...>_: one or more names of the primary ZFS filesystem that is primary ZFS filesystem.
+- _\<archive filesystem\>_: The name of the ZFS filesystem, which stores the primary ZFS filesystems.
+- _\<primary filesystem...>_: One or more names of the ZFS filesystem which are archived.
 
-e.g., Back up two of the primary ZFS pools named _root.pool_ and _storage.pool_ to the _backup.pool_ pool.
+e.g., archive two of the primary ZFS pools named _root.pool_ and _storage.pool_ to the _archive.pool_ archive ZFS pool.
 
 ```bash
-sudo elephant-backup backup -a backup.pool root.pool storage.pool
+sudo elephant-backup backup -a archive.pool root.pool storage.pool
 ```
 
 ### Snapshot
 
-Take snapshots automatically with the `systemd` auto-launcher.
+Take snapshots automatically with the `systemd` timer.
 
 ```bash
-elephant-backup systemd-install <primary ZFS filesystem...>
+elephant-backup systemd-install <primary filesystem...>
 ```
 
-- _\<primary ZFS filesystem\>_: the name of the ZFS filesystem that stores the primary ZFS filesystems.
+- _\<primary filesystem\>_: One or more names of the ZFS filesystem which are taken automatically.
 
-e.g., you take automatically snapshots named _root.pool_ and _storage.pool_.
+e.g., automatically take snapshots named _root.pool_ and _storage.pool_.
 
 - Start to take snapshots automatically.
    ```bash
    sudo elephant-backup systemd-install root.pool storage.pool
    ```
 
-- Stop to take snapshots automatically.
+- Stop taking snapshots automatically.
    ```bash
    sudo elephant-backup systemd-uninstall
    ```
@@ -79,7 +80,8 @@ e.g., you take automatically snapshots named _root.pool_ and _storage.pool_.
 ### Other Usages
 
 Run the `elephant-backup` command with the `-h` option.  
-Elephant Backup has three sub-commands, `backup`, `diff`, and `snapshot` which are also available with the `-h` option.
+Elephant Backup has three sub-commands and two auto-snapshot above.  
+See more details using the `-h` option with sub-command.
 
 ```bash
 elephant-backup -h
@@ -93,12 +95,11 @@ elephant-backup snapshot -h
 
 ## Environment
 
-Patineboot confirmed Elephant Backup on the following software environment.
-Elephant Backup is designed to run with the later or earlier versions.
+Elephant Backup runs on the following software environment or later versions.
 
 Operating System:
 
-- Ubuntu Server 22.04 with OpenZFS 2.1.2 installed
+- Ubuntu Server 22.04.1 LTS with OpenZFS 2.1.4 installed
 
 Software Programs:
 
@@ -106,9 +107,9 @@ Software Programs:
 
 ## For Developers
 
-Patineboot continues to develop Elephant Backup.
+I have developed Elephant Backup currently.
 
-Patineboot will create the new feature:
+Will arrive the new feature:
 
 - purging some existing snapshots from remaining size.
 
