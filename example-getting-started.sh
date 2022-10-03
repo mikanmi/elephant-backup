@@ -24,7 +24,7 @@ echo '\n'
 
 echo 'Back up the primary filesystem[s] to the archive filesystem.'
 echo '====================>'
-elephant-backup backup -a ${ARCHIVE} ${PRIMARIES}
+elephant-backup backup -p -a ${ARCHIVE} ${PRIMARIES}
 echo '\n'
 
 echo 'Verify the the archive filesystem using the diff subcommand.'
