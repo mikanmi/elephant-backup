@@ -45,11 +45,14 @@ export class ElephantBackup {
         }
 
         const option = CommandLine.getOption();
-        if (option.verbose) {
-            logger.setLogLevel(LogLevel.DEBUG);
-        }
+
+        const logLevel = 
+            option.progress ? LogLevel.PROG:
+            option.verbose ? LogLevel.DEBUG: // NOSONAR
+            LogLevel.PRINT;
+        logger.setLogLevel(logLevel);
         if (option.develop) {
-            logger.setLogLevel(LogLevel.DEVL);
+            logger.enableLongFormat();
         }
 
         // Start logging, and print the starting message.

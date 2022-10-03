@@ -13,16 +13,17 @@ import { CommandLine } from './CommandLine.js';
 
 const logger = Logger.getLogger();
 
-export class Command {
+
+export class Process {
     /**
      * @type {string} a command with arguments.
      */
     #commandWithArguments;
 
     /**
-     * @type {Command|null} a command to be piped.
+     * @type {Process|null} a piped process.
      */
-    #nextCommand = null;
+    #pipedProcess = null;
 
     /**
      * @type {((data: any) => void)|null}
@@ -36,7 +37,7 @@ export class Command {
     printStdoutImmediately = false;
 
     /**
-     * Construct a Command instance with a command line.
+     * Construct a Process instance with a command line.
      * @param {string} commandWithArgs a command line.
      */
     constructor(commandWithArgs) {
@@ -52,8 +53,8 @@ export class Command {
     }
 
     /**
-     * Spawn the command line if not DryRun.
-     * @param {stream.Readable|null} stdin supply the command a standard input. No supply if null.
+     * Spawn the process with the standard input. If the DryRun option is enable, print the process.
+     * @param {stream.Readable|null} stdin the standard input of the process. No supply if null.
      * @return {Promise<string>} The result of spawn the command line.
      */
      async spawnIfNoDryRunAsync(stdin = null) {
@@ -66,8 +67,8 @@ export class Command {
     }
 
     /**
-     * Spawn the command line.
-     * @param {stream.Readable|null} stdin the command running with the standard input.
+     * Spawn the process with the standard input.
+     * @param {stream.Readable|null} stdin the standard input of the process. No supply if null.
      * @return {Promise<string>} The result of spawn the command line.
      */
      async spawnAsync(stdin = null) {
@@ -87,8 +88,8 @@ export class Command {
         stdin?.pipe(child.stdin);
 
         // bind the child's stdout and the next command's stdin. 
-        if (this.#nextCommand) {
-            const nextPromise = this.#nextCommand.spawnAsync(child.stdout);
+        if (this.#pipedProcess) {
+            const nextPromise = this.#pipedProcess.spawnAsync(child.stdout);
             promises.push(nextPromise);
         }
 
@@ -110,7 +111,7 @@ export class Command {
 
         const promise = new Promise((resolve, _) => {
             // skip this stdout handler if piped stdout to the child's stdin
-            if (!this.#nextCommand) {
+            if (!this.#pipedProcess) {
                 child.stdout?.on('data', (data) => {
                     const dataString = data.toString().trimEnd();
                     stdout += dataString;
@@ -148,26 +149,26 @@ export class Command {
     }
     
     /**
-     * [DryRun] Spawn the command line the same interface as spawnAsync.
-     * @param {stream.Readable|null} stdin the command running with the standard input.
+     * [DryRun] Spawn the process as same as the spawnAsync interface.
+     * @param {stream.Readable|null} stdin the standard input of the process. No supply if null.
      * @return {Promise<string>} The result of spawn the command line.
      */
      async #spawnDryRunAsync(stdin = null) {
         logger.info(`spawnDryRunAsync CMD: ${this.#commandWithArguments} / stdin: ${stdin}`);
 
         let result = '';
-        if (this.#nextCommand) {
-            result = await this.#nextCommand.#spawnDryRunAsync(stdin);
+        if (this.#pipedProcess) {
+            result = await this.#pipedProcess.#spawnDryRunAsync(stdin);
         }
         return result;
     }
 
     /**
-     * Add a command to this instance.
-     * @param {Command|null} command a command to be piped. if null, bind the stdout to the null device.
+     * Add a process to this instance.
+     * @param {Process|null} process a process to be piped. if null, bind the stdout to the null device.
      */
-    add(command) {
-        this.#nextCommand = command;
+    add(process) {
+        this.#pipedProcess = process;
     }
 
     /**

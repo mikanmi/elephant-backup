@@ -8,7 +8,7 @@
 
 import path from 'node:path';
 
-import { Command } from './Command.js'
+import { Process } from './Process.js'
 import { CommandLine } from './CommandLine.js';
 import { Configure } from './Configure.js';
 import { Logger } from './Logger.js';
@@ -80,7 +80,7 @@ export class ZfsUtilities {
      static async takeSnapshot(snapshot, filesystem) {
         const fullSnapshotName = `${filesystem}@${snapshot}`
         const zfsCommand = `${ZfsCommands.ZFS_SNAPSHOT_RECURSIVE} ${fullSnapshotName}`;
-        const command = new Command(zfsCommand);
+        const command = new Process(zfsCommand);
         await command.spawnIfNoDryRunAsync();
 
         logger.print(`Taken the new snapshot: ${fullSnapshotName}`);
@@ -94,7 +94,7 @@ export class ZfsUtilities {
      */
      static async destroySnapshot(snapshot, filesystem) {
         const zfsCommand = `${ZfsCommands.ZFS_DESTROY_RECURSIVE} ${filesystem}@${snapshot}`;
-        const command = new Command(zfsCommand);
+        const command = new Process(zfsCommand);
         await command.spawnIfNoDryRunAsync();
 
         logger.print(`Purged the snapshot: ${filesystem}@${snapshot}`);
@@ -107,7 +107,7 @@ export class ZfsUtilities {
      */
     static async createZfsDataset(dataset, filesystem) {
         const zfsCommand = `${ZfsCommands.ZFS_CREATE_DATASET} ${filesystem}/${dataset}`;
-        const command = new Command(zfsCommand);
+        const command = new Process(zfsCommand);
         command.printStdoutImmediately = true;
         await command.spawnIfNoDryRunAsync();
     }
@@ -129,7 +129,7 @@ export class ZfsUtilities {
         // Show the estimated size of transporting the filesystem.
         const estimateCommandLine = 
                 `${ZfsCommands.ZFS_SEND_RAW} ${estimateOption} ${firstSnapshot} ${lastSnapshot}`;
-        const estimateCommand = new Command(estimateCommandLine);
+        const estimateCommand = new Process(estimateCommandLine);
         estimateCommand.setStdErrHandler(null);
         const stdout = await estimateCommand.spawnIfNoDryRunAsync();
 
@@ -152,7 +152,9 @@ export class ZfsUtilities {
         const intermediate = last == '' ? '' : '-I';
 
         const dryRun = option.dryRun ? '-n' : '';
-        const verbose = option.verbose ? '-v' : '';
+
+        const enableVerbose = option.verbose || option.progress;
+        const verbose = enableVerbose ? '-v' : '';
 
         const firstSnapshot = `${filesystem}@${first}`;
         const lastSnapshot = last == '' ? last : `${filesystem}@${last}`;
@@ -162,20 +164,19 @@ export class ZfsUtilities {
         const stderrHandler = (/** @type {any} */ data) => {
             const dataString = data.toString().trimEnd();
             // `zfs send` with `-v` option prints the sending progress on the stderr.
-            // Elephant Backup piped stderr to its own stdout.
-            // Then Elephant Backup prints the sending progress on the stdout.
-            logger.print(`${dataString}`);
+            // Elephant Backup transfers the stderr of `zfs send` to its own stdout.
+            logger.prog(`${dataString}`);
         };
 
         const sendCommandLine = 
                 `${ZfsCommands.ZFS_SEND_RAW} ${dryRun} ${verbose} ${intermediate} ${firstSnapshot} ${lastSnapshot}`;
-        const sendCommand = new Command(sendCommandLine);
+        const sendCommand = new Process(sendCommandLine);
         sendCommand.setStdErrHandler(stderrHandler);
 
         // Building the receive command of the snapshots.
         const receiveCommandLine =
                 `${ZfsCommands.ZFS_RECV_INCREMENTAL} ${archive}`;
-        const receiveCommand = new Command(receiveCommandLine);
+        const receiveCommand = new Process(receiveCommandLine);
         receiveCommand.printStdoutImmediately = true;
         sendCommand.add(receiveCommand);
 
@@ -190,7 +191,7 @@ export class ZfsUtilities {
      */
     static async diff(snapshot, filesystem) {
         const zfsCommand = `${ZfsCommands.ZFS_DIFF} ${snapshot} ${filesystem}`
-        const command = new Command(zfsCommand);
+        const command = new Process(zfsCommand);
         command.printStdoutImmediately = true;
         const result = await command.spawnIfNoDryRunAsync();
 
@@ -202,7 +203,7 @@ export class ZfsUtilities {
      * @returns {Promise<string[]>} the ZFS zpool list on this machine.
      */
     static async rootFilesystemList() {
-        const command = new Command(ZfsCommands.ZPOOL_LIST_ZPOOL);
+        const command = new Process(ZfsCommands.ZPOOL_LIST_ZPOOL);
         const result = await command.spawnAsync();
 
         const filesystems = result === '' ? [] : result.split('\n');
@@ -221,7 +222,7 @@ export class ZfsUtilities {
         const recursive = filesystem === '' ? '' : '-r';
         const commandList = `${ZfsCommands.ZFS_LIST_FILESYSTEM} ${recursive} ${filesystem}`;
 
-        const command = new Command(commandList);
+        const command = new Process(commandList);
         const result = await command.spawnAsync();
 
         const filesystems = result === '' ? [] : result.split('\n');
@@ -238,7 +239,7 @@ export class ZfsUtilities {
      */
     static async snapshotList(filesystem, snapshot = null) {
         const zfsCommand = `${ZfsCommands.ZFS_LIST_SNAPSHOT} ${filesystem}`
-        const command = new Command(zfsCommand);
+        const command = new Process(zfsCommand);
         const result = await command.spawnAsync();
 
         const snapshots = result === '' ? [] : result.split('\n');
@@ -263,7 +264,7 @@ export class ZfsUtilities {
         const installerPath = path.join(elephantPath, ZfsCommands.ELEBA_SYSTEMD_UNIT_INSTALLER);
 
         const zfsCommand = `${installerPath} ${option} ${filesystems.join(" ")}`;
-        const command = new Command(zfsCommand);
+        const command = new Process(zfsCommand);
         command.printStdoutImmediately = true;
         await command.spawnIfNoDryRunAsync();
     }

@@ -6,7 +6,7 @@
  */
 'use strict'
 
-import { Command, Option } from 'commander';
+import { Command } from 'commander';
 
 import packageJson from '../package.json' assert {type: 'json'};
 
@@ -17,11 +17,6 @@ export class CommandType {
     static SYSTEMD_INSTALL = 'systemd-install';
     static SYSTEMD_UNINSTALL = 'systemd-uninstall';
 }
-
-/**
- * A number, or a string containing a number.
- * @typedef {{archive: 'unexpected', dryRun: false, verbose: false, develop: false, list: false}} OptionList
- */
 
 export class CommandOption {
 
@@ -39,6 +34,7 @@ export class CommandOption {
         this.#verbose_ = opts.verbose;
         this.#develop_ = opts.develop;
         this.#list_ = opts.list;
+        this.#progress_ = opts.progress;
     }
 
     /** @type {string} */
@@ -75,6 +71,11 @@ export class CommandOption {
     #list_;
     get list() {
         return this.#list_;
+    }
+    /** @type {boolean} */
+    #progress_;
+    get progress() {
+        return this.#progress_;
     }
 }
 
@@ -137,7 +138,6 @@ export class CommandLine {
      * @returns {string}
      */
     get subcommand() {
-        // TODO: the class hold arg[0] instead of program.
         return this.#program.args[0];
     }
 
@@ -153,7 +153,10 @@ export class CommandLine {
             subcommand
             .description('Back up any ZFS filesystems to another ZFS filesystems.')
             .requiredOption('-a, --archive <ZFS filesystem>',
-            'Specify <ZFS filesystem> to store any primary ZFS filesystems.');
+            'Specify <ZFS filesystem> to store any primary ZFS filesystems.')
+            .option('-p, --progress',
+                    'show the progress of backing up ZFS filesystems.',
+                    false);
         break;
         case CommandType.DIFF:
             subcommand
@@ -163,7 +166,10 @@ export class CommandLine {
             break;
         case CommandType.SNAPSHOT:
             subcommand
-            .description('Take a snapshot and purge some existing snapshots on a ZFS filesystem.');
+            .description('Take a snapshot and purge some existing snapshots on a ZFS filesystem.')
+            .option('-l, --list',
+                    'show the Elephant Backup snapshots.',
+                    false);
             break;
         case CommandType.SYSTEMD_INSTALL:
             subcommand
@@ -176,13 +182,7 @@ export class CommandLine {
         }
 
         switch(commandType) {
-        // @ts-ignore
         case CommandType.SNAPSHOT:
-            subcommand
-            .option('-l, --list',
-                    'show the Elephant Backup snapshots.',
-                    false);
-            // Fallthrough
         case CommandType.BACKUP:
         case CommandType.DIFF:
         case CommandType.SYSTEMD_INSTALL:
@@ -204,15 +204,13 @@ export class CommandLine {
 
         subcommand
         .option('-v, --verbose',
-                'run with the verbose mode.',
+                'Print verbose information running on the program.',
                 false)
         .option('-n, --dry-run',
-                'run with no change made.',
+                'Run the program under no changes.',
                 false)
-        .addOption(new Option(
-                '-d, --develop',
-                'run with the develop mode.')
-                .default(false)
-                .conflicts('verbose'));
+        .option('-d, --develop',
+                'Print information with the long format prefix.',
+                false);
     }
 }

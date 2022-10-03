@@ -35,12 +35,12 @@ class LogType {
 }
 
 export class LogLevel {
-    static DEVL =  new LogType('DEV', 0);
     static DEBUG = new LogType('DBG', 1);
     static INFO =  new LogType('INF', 2);
-    static PRINT = new LogType('PRT', 3);
-    static WARN =  new LogType('WRN', 4);
-    static ERROR = new LogType('ERR', 5);
+    static PROG =  new LogType('PRO', 3);
+    static PRINT = new LogType('PRT', 4);
+    static WARN =  new LogType('WRN', 5);
+    static ERROR = new LogType('ERR', 6);
 }
 
 class LogWriter {
@@ -257,7 +257,10 @@ export class Logger {
         return Logger.#defaultInstance;
     }
 
-    /** @type{LogType} The Log Level. */
+    /** @type{boolean} The log long format. */
+    #logLongFormat = false;
+
+    /** @type{LogType} The log level. */
     #logLevel = LogLevel.PRINT;
 
     /** @type {LogWriter[]} */
@@ -276,6 +279,10 @@ export class Logger {
      */
     setLogLevel(level) {
         this.#logLevel = level;
+    }
+
+    enableLongFormat() {
+        this.#logLongFormat = true;
     }
 
     /**
@@ -308,7 +315,7 @@ export class Logger {
                 `[${dateString}]${caller.filename}:${caller.lineno}[${level.TAG}]`;
 
         // Print the log message.
-        const prefix = this.#logLevel === LogLevel.DEVL ? longPrefix : shortPrefix;
+        const prefix = this.#logLongFormat ? longPrefix : shortPrefix;
         this.#writeLine(`${prefix} ${message}`)
     }
 
@@ -355,15 +362,6 @@ export class Logger {
     }
 
     /**
-     * Prints an warning message.
-     * @param {any} format
-     * @param {any[]} params
-     */
-    warn(format, ...params) {
-        this.#printLog(LogLevel.WARN, format, ...params);
-    }
-
-    /**
      * Prints an error message.
      * @param {any} format
      * @param {any[]} params
@@ -373,7 +371,25 @@ export class Logger {
     }
 
     /**
-     * Prints an warning message.
+     * Prints a warning message.
+     * @param {any} format
+     * @param {any[]} params
+     */
+    warn(format, ...params) {
+        this.#printLog(LogLevel.WARN, format, ...params);
+    }
+
+    /**
+     * Prints a progress message.
+     * @param {any} format
+     * @param {any[]} params
+     */
+    prog(format, ...params) {
+        this.#printLog(LogLevel.PROG, format, ...params);
+    }
+
+    /**
+     * Prints an information message.
      * @param {any} format
      * @param {any[]} params
      */
@@ -382,7 +398,7 @@ export class Logger {
     }
 
     /**
-     * Prints an debug message.
+     * Prints a debug message.
      * @param {any} format
      * @param {any[]} params
      */
