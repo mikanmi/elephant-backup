@@ -21,20 +21,19 @@ Released Elephant Backup with `npm` : <https://www.npmjs.com/package/elephant-ba
 
 ### Install Elephant Backup
 
-   ```bash
-   npm install elephant-backup
-   ```
+```bash
+npm install elephant-backup
+```
 
-Note:
-
-Install `npm` with the `apt` package manager if `npm` does not exist on Ubuntu.  
+Note:  
+Install `npm` with the `apt` package manager if `npm` does not exist on Ubuntu.
 Install `node` with `npm` and **reboot** after installing `npm`.
 
-   ```bash
-   apt install npm
-   npm --global install node
-   reboot
-   ```
+```bash
+apt install npm
+npm --global install node
+reboot
+```
 
 ## Usage
 
