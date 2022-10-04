@@ -113,7 +113,6 @@ class FileLogWriter extends LogWriter {
             await fh.close();
             await fsPromises.chmod(filePath, 0o666);
         }
-
         this.#fileHandle = fs.openSync(Configure.LOG_FILE_PATH, 'as');
     }
 
@@ -128,13 +127,12 @@ class FileLogWriter extends LogWriter {
     }
 
     /**
-     * Truncate the head of a file.
+     * Truncate the head of the log file.
      * 
      * @param {string} filePath the path of the file.
      * @param {number} size the new size of the file.
      */
     async #truncate(filePath, size) {
-
         if (!fs.existsSync(filePath)) {
             // return if the file dose not exist.
             return;
@@ -145,37 +143,21 @@ class FileLogWriter extends LogWriter {
         try {
             fileHandle = await fsPromises.open(filePath, 'r+');
 
-            // calculate the starting position to read the file.
+            // calculate the starting position to find record in the file.
             const stat = await fileHandle.stat();
-            const findStart = stat.size - size;
-            if (findStart <= 0) {
+            const tryPosition = stat.size - size;
+            if (tryPosition <= 0) {
                 // return immediately if the size variable is shorter than the file size.
                 return;
             }
 
-            // Find the first record after truncating the log file.
-            const movePosition = await this.#findFirstRecord(fileHandle, findStart);
+            // find the first record after truncating the log file.
+            const movePosition = await this.#findFirstRecord(fileHandle, tryPosition);
             if (movePosition >= 0) {
-                truncatingSize = stat.size - movePosition;
+                // move the records in the log file to the head of log file.
+                truncatingSize = await this.#moveDataToHead(fileHandle, movePosition, );
             }
-
-            const buffer = new Uint8Array(16 * 1024); // 16K bytes
-            let readingPosition = movePosition;
-            let writingPosition = 0;
-            for (;;) { // NOSONAR
-                const { bytesRead } = await fileHandle.read(buffer, 0, buffer.length, readingPosition);
-                if (bytesRead == 0) {
-                    // complete moving the logs from the read-position to the top.
-                    break;
-                }
-                readingPosition += bytesRead;
-
-                const { bytesWritten } = await fileHandle.write(buffer, 0, bytesRead, writingPosition);
-                if (bytesWritten != bytesRead) {
-                    throw new Error('Writing to the log file is failed while truncating it.');
-                }
-                writingPosition += bytesWritten;
-            }
+            // if a record is not found, truncate the log file to zero.
         }
         finally{
             await fileHandle?.close();
@@ -184,10 +166,43 @@ class FileLogWriter extends LogWriter {
     }
 
     /**
+     * Move the data in the file to the head of the file.
+     * @param {fsPromises.FileHandle} fileHandle
+     * @param {number} movePosition the starting position to move the data.
+     * @returns {Promise<number>} the size of the moved data.
+     * @throws {Error} if occur error on writing data.
+     */
+    async #moveDataToHead(fileHandle, movePosition) {
+        const buffer = new Uint8Array(16 * 1024); // 16K bytes
+
+        if (movePosition < 0) {
+            throw new Error(`movePosition is the negative value: ${movePosition}`);
+        }
+
+        let readingPosition = movePosition;
+        let writingPosition = 0;
+        for (;;) { // NOSONAR
+            const { bytesRead } = await fileHandle.read(buffer, 0, buffer.length, readingPosition);
+            if (bytesRead == 0) {
+                // complete moving the logs from the read-position to the top.
+                break;
+            }
+            readingPosition += bytesRead;
+
+            const { bytesWritten } = await fileHandle.write(buffer, 0, bytesRead, writingPosition);
+            if (bytesWritten != bytesRead) {
+                throw new Error('Writing the data is failed while moving the data.');
+            }
+            writingPosition += bytesWritten;
+        }
+        return writingPosition;
+    }
+
+    /**
      * Find the new starting record on the log file.
      * @param {fsPromises.FileHandle} fileHandle
      * @param {number} startPosition the position to start to find the new starting record.
-     * @returns the position of the new starting record, a negative value if not found.
+     * @returns {Promise<number>}the position of the new starting record, a negative value if not found.
      */
     async #findFirstRecord(fileHandle, startPosition) {
         const buffer = new Uint8Array(16 * 1024); // 16K bytes

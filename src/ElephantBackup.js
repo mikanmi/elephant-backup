@@ -38,12 +38,6 @@ export class ElephantBackup {
     }
 
     async start() {
-        if (!ElephantBackup.isSuperUser()) {
-            console.log(`Run the Elephant backup on the SUPER user.`);
-            console.log(`e.g., sudo ${packageJson.name} --help`);
-            process.exit();
-        }
-
         const option = CommandLine.getOption();
 
         const logLevel = 
@@ -63,6 +57,11 @@ export class ElephantBackup {
         logger.info(`Arguments: ${option.arguments}`);
         logger.info(`Option => `);
         logger.info(option);
+
+        if (!ElephantBackup.isSuperUser()) {
+            logger.error(`Run the Elephant backup on the SUPER user.`);
+            logger.exit(`e.g., sudo ${packageJson.name} --help`);
+        }
 
         const subcommand = SubCommand.create(option.subCommand);
         await subcommand.run();
