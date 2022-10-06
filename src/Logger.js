@@ -552,6 +552,3 @@ function getFilename(path) {
     const filename = pathElements[pathElements.length -1];
     return filename;
 }
-
-
-
