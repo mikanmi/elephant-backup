@@ -7,6 +7,7 @@
  'use strict'
 
 import path from "node:path";
+import os from "node:os";
 import * as fsPromises from 'node:fs/promises';
 
 export class Configure {
@@ -34,6 +35,8 @@ export class Configure {
     /** @type {number} The maximum size of the log file */
     static LOG_FILE_SIZE = 5 * 1024 * 1024; // 5 MiB
 
+    /** @type {string} The absolute path of the lock file used in Semaphore */
+    static LOG_REFERENCE_FILE_PATH = path.join(os.tmpdir(), 'elephant-backup.reference');
 
     /** @type {string} The prefix of the name of snapshots */
     static PREFIX_SNAPSHOT = 'elephant';
@@ -46,7 +49,6 @@ export class Configure {
 
     /** @type {number} The number of hourly snapshots keeping */
     static SNAPSHOT_KEEP_HOURS = 24;
-
 
     /** @type {string} The 'enable' behavior of systemd subcommand */
     static SYSTEMD_BEHAVIOR_ENABLE = 'enable';

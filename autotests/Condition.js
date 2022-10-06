@@ -158,6 +158,12 @@ export class Condition {
         this.destroyPool(this.zfsPoolArchive);
         this.destroyPool(this.zfsPool2);
         this.destroyPool(this.zfsPool1);
+
+        // Make the temporary directory.
+        const absoluteFilePath = path.resolve(this.settings.current, this.temporaryDirectory);
+
+        const removeCommand =  `rm -rf ${absoluteFilePath}`;
+        this.spawnSync(removeCommand);
     }
 }
 

@@ -69,13 +69,6 @@ class LogWriter {
 
 class ConsoleLogWriter extends LogWriter {
     /**
-     * Prepare this LogWriter.
-     */
-    async prepare() {
-        // nothing to do.
-    }
-
-    /**
      * Write the message to the log file.
      * 
      * @param {string} line a line to write to the log file.
@@ -105,7 +98,15 @@ class FileLogWriter extends LogWriter {
         const size = Configure.LOG_FILE_SIZE;
 
         if (fs.existsSync(filePath)) {
-            await this.#truncate(filePath, size);
+            // throw an error if any of the accessibility checks fail.
+            await fsPromises.access(filePath, fs.constants.R_OK | fs.constants.W_OK);
+
+            // Race Condition:
+            // Create the count file on the /tmp directory while application running.
+            // Skip the truncate method if other applications reference.
+            if (LogFileReference.Instance.Count == 1) {
+                await this.#truncate(filePath, size);
+            }
         }
         else {
             // create the empty log file with the permission to read and write on every user.
@@ -113,7 +114,8 @@ class FileLogWriter extends LogWriter {
             await fh.close();
             await fsPromises.chmod(filePath, 0o666);
         }
-        this.#fileHandle = fs.openSync(Configure.LOG_FILE_PATH, 'as');
+
+        this.#fileHandle = fs.openSync(filePath, 'as');
     }
 
     /**
@@ -288,6 +290,14 @@ export class Logger {
         // nothing to do.
     }
 
+    async initialize() {
+        await LogFileReference.createInstance();
+    }
+
+    async destroy() {
+        await LogFileReference.Instance.destroy();
+    }
+
     /**
      * Set a log level.
      * @param {LogType} level
@@ -342,7 +352,6 @@ export class Logger {
             await writer.prepare();
         }
     }
-
 
     /**
      * Write a message to the console and log writers.
@@ -429,6 +438,72 @@ export class Logger {
     exit(format, ...params) {
         this.#printLog(LogLevel.ERROR, format, ...params);
         process.exit();
+    }
+}
+
+class LogFileReference {
+
+    /** @type {LogFileReference} */
+    static #instance;
+
+    /** @type {string} */
+    #filePath = Configure.LOG_REFERENCE_FILE_PATH;
+
+    /**
+     * 
+     * @returns {Promise<LogFileReference>}
+     */
+    static async createInstance() {
+        const refFile = Configure.LOG_REFERENCE_FILE_PATH;
+
+        const instance  = new LogFileReference();
+        LogFileReference.#instance = instance;
+        const exist = fs.existsSync(refFile);
+        if (exist) {
+            instance.#addReference();
+        }
+        else {
+            instance.#writeReference(1);
+        }
+
+        return instance;
+    }
+
+    /**
+     * 
+     * @returns {LogFileReference}
+     */
+    static get Instance () {
+        return LogFileReference.#instance;
+    }
+
+    async destroy() {
+        let count = this.Count;
+        count--;
+        this.#writeReference(count);
+        if (count == 0) {
+            fs.rmSync(this.#filePath);
+        }
+    }
+
+    #addReference() {
+        let count = this.Count;
+        count++;
+        this.#writeReference(count);
+    }
+
+    get Count() {
+        const referenceString = fs.readFileSync(this.#filePath, {encoding: 'utf8'} );
+        let reference = parseInt(referenceString);
+        return reference;
+    }
+
+    /**
+     * 
+     * @param {number} count 
+     */
+    #writeReference(count) {
+        fs.writeFileSync(this.#filePath, count.toString());
     }
 }
 

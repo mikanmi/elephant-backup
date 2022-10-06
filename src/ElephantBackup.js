@@ -38,6 +38,16 @@ export class ElephantBackup {
     }
 
     async start() {
+        try {
+            await logger.initialize();
+            await this.#run();
+        }
+        finally {
+            await logger.destroy();
+        }
+    }
+
+    async #run() {
         const option = CommandLine.getOption();
 
         const logLevel = 
@@ -66,6 +76,4 @@ export class ElephantBackup {
         const subcommand = SubCommand.create(option.subCommand);
         await subcommand.run();
     }
-
 }
- 
