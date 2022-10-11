@@ -20,11 +20,6 @@ const logger = Logger.getLogger();
  */
 class ZfsCommands {
     /**
-     * @types {string} The command line that shows ZFS zpool on this machine.
-     */
-    static ZPOOL_LIST_ZPOOL = 'zpool list -H -o name';
-
-    /**
      * @types {string} The command line that shows ZFS filesystems on this machine.
      */
     static ZFS_LIST_FILESYSTEM = 'zfs list -H -o name -t filesystem';
@@ -42,27 +37,27 @@ class ZfsCommands {
     /**
      * @types {string} The command line that sends a ZFS filesystem.
      */
-    static ZFS_SEND_RAW = 'zfs send -Rw'
+    static ZFS_SEND_RAW = 'zfs send -Rw';
 
     /**
      * @types {string} The command line that receives a ZFS filesystem.
      */
-    static ZFS_RECV_INCREMENTAL = 'zfs recv -F -d -x mountpoint'
+    static ZFS_RECV_INCREMENTAL = 'zfs recv -F -d -x mountpoint';
 
     /**
-     * @types {string} The command line that diffs a snapshot and current on the a filesystem.
+     * @types {string} Get a value on property on a ZFS filesystem.
      */
-    static ZFS_DIFF = 'zfs diff'
+    static ZFS_GET_PROPERTY = 'zfs get -H -o value';
 
     /**
-     * @types {string} The command line that diffs a snapshot and current on the a filesystem.
+     * @types {string} Take a snapshot on a ZFS filesystem.
      */
-    static ZFS_SNAPSHOT_RECURSIVE = 'zfs snapshot -r'
+    static ZFS_TAKE_SNAPSHOT_RECURSIVE = 'zfs snapshot -r';
 
     /**
-     * @types {string} The command line that diffs a snapshot and current on the a filesystem.
+     * @types {string} Destroy a snapshot on a ZFS filesystem.
      */
-    static ZFS_DESTROY_RECURSIVE = 'zfs destroy -r'
+    static ZFS_DESTROY_SNAPSHOT_RECURSIVE = 'zfs destroy -r';
 
     /**
      * @types {string} The command line that enable-disable the Elephant Backup systemd unit.
@@ -71,45 +66,46 @@ class ZfsCommands {
 }
 
 export class ZfsUtilities {
+
     /**
-     * Take a snapshot on the ZFS filesystem.
+     * Take a snapshot on a ZFS filesystem.
      * @param {string} snapshot a snapshot.
      * @param {string} filesystem a ZFS filesystem.
-     * @return {Promise<string>} the new snapshot name.
+     * @return {Promise<string>} the new snapshot long name.
      */
      static async takeSnapshot(snapshot, filesystem) {
-        const fullSnapshotName = `${filesystem}@${snapshot}`
-        const zfsCommand = `${ZfsCommands.ZFS_SNAPSHOT_RECURSIVE} ${fullSnapshotName}`;
-        const command = new Process(zfsCommand);
-        await command.spawnIfNoDryRunAsync();
+        const snapshotLongName = `${filesystem}@${snapshot}`
 
-        logger.print(`Taken the new snapshot: ${fullSnapshotName}`);
-        return fullSnapshotName;
+        const command = `${ZfsCommands.ZFS_TAKE_SNAPSHOT_RECURSIVE} ${snapshotLongName}`;
+        const process = new Process(command);
+        process.syncResult();
+        await process.spawnIfNoDryRunAsync();
+
+        logger.print(`Taken the new snapshot: ${snapshotLongName}`);
+        return snapshotLongName;
     }
 
     /**
-     * Destroy a snapshot on the ZFS filesystem.
+     * Destroy a snapshot on a ZFS filesystem.
      * @param {string} snapshot a snapshot.
      * @param {string} filesystem a ZFS filesystem.
      */
      static async destroySnapshot(snapshot, filesystem) {
-        const zfsCommand = `${ZfsCommands.ZFS_DESTROY_RECURSIVE} ${filesystem}@${snapshot}`;
-        const command = new Process(zfsCommand);
-        await command.spawnIfNoDryRunAsync();
+        const command = `${ZfsCommands.ZFS_DESTROY_SNAPSHOT_RECURSIVE} ${filesystem}@${snapshot}`;
+        const process = new Process(command);
+        await process.spawnIfNoDryRunAsync();
 
         logger.print(`Purged the snapshot: ${filesystem}@${snapshot}`);
     }
 
     /**
-     * Create the ZFS dataset on the ZFS filesystem.
-     * @param {string} dataset a ZFS dataset to create.
-     * @param {string} filesystem a ZFS filesystem.
+     * Create a ZFS dataset on a ZFS filesystem.
+     * @param {string} dataset a ZFS dataset to be created.
      */
-    static async createZfsDataset(dataset, filesystem) {
-        const zfsCommand = `${ZfsCommands.ZFS_CREATE_DATASET} ${filesystem}/${dataset}`;
-        const command = new Process(zfsCommand);
-        command.printStdoutImmediately = true;
-        await command.spawnIfNoDryRunAsync();
+    static async createZfsDataset(dataset) {
+        const command = `${ZfsCommands.ZFS_CREATE_DATASET} ${dataset}`;
+        const process = new Process(command);
+        await process.spawnIfNoDryRunAsync();
     }
 
     /**
@@ -127,13 +123,14 @@ export class ZfsUtilities {
         const lastSnapshot = last == '' ? last : `${filesystem}@${last}`;
 
         // Show the estimated size of transporting the filesystem.
-        const estimateCommandLine = 
+        const command = 
                 `${ZfsCommands.ZFS_SEND_RAW} ${estimateOption} ${firstSnapshot} ${lastSnapshot}`;
-        const estimateCommand = new Process(estimateCommandLine);
-        estimateCommand.setStdErrHandler(null);
-        const stdout = await estimateCommand.spawnIfNoDryRunAsync();
+        const process = new Process(command);
+        process.syncResult();
+        const stdout = await process.spawnIfNoDryRunAsync();
 
-        // stdout involves the total size line like 'total estimated size is 1.22K.'
+        // get the 'total size line' from stdout
+        // stdout involves the 'total estimated size is 1.22K.' line.
         const words = stdout.split(' ');
         const size = words[words.length - 1];
 
@@ -159,71 +156,43 @@ export class ZfsUtilities {
         const firstSnapshot = `${filesystem}@${first}`;
         const lastSnapshot = last == '' ? last : `${filesystem}@${last}`;
 
-        // Spawn the backup commands set after creating and building the three below commands.
-        // Building the send command of the filesystem.
-        const stderrHandler = (/** @type {any} */ data) => {
+        /** @param {any} data */
+        function stderrHandler(data) {
             const dataString = data.toString().trimEnd();
-            // `zfs send` with `-v` option prints the sending progress on the stderr.
-            // Elephant Backup transfers the stderr of `zfs send` to its own stdout.
+            // `zfs send -v` print the progress on the stderr.
+            // prints the progress of `zfs send`.
             logger.prog(`${dataString}`);
-        };
+        }
 
-        const sendCommandLine = 
+        // zfs send command.
+        const sendCommand = 
                 `${ZfsCommands.ZFS_SEND_RAW} ${dryRun} ${verbose} ${intermediate} ${firstSnapshot} ${lastSnapshot}`;
-        const sendCommand = new Process(sendCommandLine);
-        sendCommand.setStdErrHandler(stderrHandler);
+        const sendProcess = new Process(sendCommand);
+        sendProcess.setStderrHandler(stderrHandler);
 
-        // Building the receive command of the snapshots.
-        const receiveCommandLine =
+        // zfs recv command.
+        const recvCommand =
                 `${ZfsCommands.ZFS_RECV_INCREMENTAL} ${archive}`;
-        const receiveCommand = new Process(receiveCommandLine);
-        receiveCommand.printStdoutImmediately = true;
-        sendCommand.add(receiveCommand);
+        const recvProcess = new Process(recvCommand);
+        sendProcess.add(recvProcess);
 
-        await sendCommand.spawnIfNoDryRunAsync();
+        // run the `zfs send` and  `zfs recv` 
+        await sendProcess.spawnIfNoDryRunAsync();
     }
 
     /**
-     * Diff the snapshot and the current on the ZFS filesystem.
-     * @param {string} snapshot a snapshot on the ZFS filesystem.
-     * @param {string} filesystem a ZFS filesystem.
-     * @returns {Promise<string>} the message of the difference.
-     */
-    static async diff(snapshot, filesystem) {
-        const zfsCommand = `${ZfsCommands.ZFS_DIFF} ${snapshot} ${filesystem}`
-        const command = new Process(zfsCommand);
-        command.printStdoutImmediately = true;
-        const result = await command.spawnIfNoDryRunAsync();
-
-        return result;
-    }
-
-    /**
-     * Get the ZFS zpools on the this machine.
-     * @returns {Promise<string[]>} the ZFS zpool list on this machine.
-     */
-    static async rootFilesystemList() {
-        const command = new Process(ZfsCommands.ZPOOL_LIST_ZPOOL);
-        const result = await command.spawnAsync();
-
-        const filesystems = result === '' ? [] : result.split('\n');
-
-        logger.debug(`ZFS filesystems: ${filesystems}`);
-        return filesystems;
-    }
-
-    /**
-     * Get the child ZFS filesystems recursively and oneself on a ZFS filesystems.
-     * @param {string} filesystem a ZFS filesystem to get child ZFS filesystems.
-     *          If empty('') string, get all of the filesystems. 
+     * Get the ZFS filesystems recursively involving itself on a ZFS filesystems.
+     * @param {string} filesystem a ZFS filesystem, which is the base filesystems.
+     *          If empty('') string, get all of the filesystems on this machine.
      * @returns {Promise<string[]>} the ZFS filesystems list of children on the ZFS filesystems.
      */
      static async filesystemList(filesystem='') {
-        const recursive = filesystem === '' ? '' : '-r';
-        const commandList = `${ZfsCommands.ZFS_LIST_FILESYSTEM} ${recursive} ${filesystem}`;
+        const recursiveString = filesystem === '' ? '' : '-r';
+        const command = `${ZfsCommands.ZFS_LIST_FILESYSTEM} ${recursiveString} ${filesystem}`;
 
-        const command = new Process(commandList);
-        const result = await command.spawnAsync();
+        const process = new Process(command);
+        process.syncResult();
+        const result = await process.spawnAsync();
 
         const filesystems = result === '' ? [] : result.split('\n');
 
@@ -232,15 +201,16 @@ export class ZfsUtilities {
     }
 
     /**
-     * Get all of the snapshots on the ZFS filesystem.
+     * Get all of the snapshots on a ZFS filesystem.
      * @param {string} filesystem a ZFS filesystem.
      * @param {string|null} snapshot a snapshot added to the snapshots for dryRun option.
      * @returns {Promise<string[]>} the snapshots on the ZFS filesystem.
      */
     static async snapshotList(filesystem, snapshot = null) {
-        const zfsCommand = `${ZfsCommands.ZFS_LIST_SNAPSHOT} ${filesystem}`
-        const command = new Process(zfsCommand);
-        const result = await command.spawnAsync();
+        const command = `${ZfsCommands.ZFS_LIST_SNAPSHOT} ${filesystem}`
+        const process = new Process(command);
+        process.syncResult();
+        const result = await process.spawnAsync();
 
         const snapshots = result === '' ? [] : result.split('\n');
         if (snapshot) {
@@ -250,6 +220,26 @@ export class ZfsUtilities {
 
         logger.debug(`Snapshots on ${filesystem}: ${snapshots}`);
         return snapshots;
+    }
+
+    /**
+     * Get a value of property on a ZFS filesystem recursively.
+     * @param {string} filesystem a ZFS filesystem.
+     * @param {string} property a property on ZFS filesystem.
+     * @param {boolean} recursive true if recursive, false in default.
+     * @returns {Promise<string[]>} the value.
+     */
+    static async getValues(filesystem, property, recursive=false) {
+        const receiveOption = recursive ? '-r' : '';
+
+        const command = `${ZfsCommands.ZFS_GET_PROPERTY} ${receiveOption} ${property} ${filesystem}`;
+        const process = new Process(command);
+        process.syncResult();
+        const result = await process.spawnAsync();
+
+        const values = result.trim().split('\n');
+        logger.debug(`Get values: ${values}`);
+        return values;
     }
 
     /**

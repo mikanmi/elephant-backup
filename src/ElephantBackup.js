@@ -74,6 +74,6 @@ export class ElephantBackup {
         }
 
         const subcommand = SubCommand.create(option.subCommand);
-        await subcommand.run();
+        await subcommand.launch();
     }
 }

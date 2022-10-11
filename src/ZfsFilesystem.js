@@ -12,6 +12,12 @@ import { CommandLine } from "./CommandLine.js";
 import { Snapshot } from "./Snapshot.js";
 import { ZfsUtilities } from "./ZfsUtilities.js";
 
+import path from "node:path";
+import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
+import * as streamPromises from "node:stream/promises";
+const { createHash } = await import('node:crypto');
+
 const logger = Logger.getLogger();
 
 export class SnapshotList {
@@ -130,8 +136,10 @@ export class SnapshotList {
 
 export class ZfsFilesystem {
 
+    static #initialized = false;
+
     /** @type {string[]} */
-    static #filesystemList = ['Unexpected filesystems'];
+    static #zfsFilesystemArray;
 
     /** @type {string} */
     #name;
@@ -140,18 +148,20 @@ export class ZfsFilesystem {
     #newSnapshot = null;
 
     /**
-     * Construct a ZfsFilesystem with the filesystem variable.
-     * @returns {Promise<ZfsFilesystem[]>} filesystem a ZFS filesystem.
+     * Get all of the ZfsFilesystems on this machine.
+     * @returns {Promise<ZfsFilesystem[]>} filesystems.
      */
-    static async getRoots() {
-        const rootList = await ZfsUtilities.rootFilesystemList();
-        const zfsFilesystems = 
-                rootList.map((filesystem) => new ZfsFilesystem(filesystem));
+    static async getFilesystems() {
 
-        // Get all of the filesystem on this machine.
-        ZfsFilesystem.#filesystemList = await ZfsUtilities.filesystemList();
+        if (!ZfsFilesystem.#initialized) {
+            ZfsFilesystem.#zfsFilesystemArray = await ZfsUtilities.filesystemList();
+            ZfsFilesystem.#initialized = true;
+        }
 
-        return zfsFilesystems;
+        const filesystemStrings = ZfsFilesystem.#zfsFilesystemArray;
+        const filesystems = 
+                filesystemStrings.map(f => new ZfsFilesystem(f));
+        return filesystems;
     }
 
     /**
@@ -165,35 +175,46 @@ export class ZfsFilesystem {
 
     /**
      * Create a ZFS Dataset on the filesystem.
-     * @param {string} dataset the name of a ZFS dataset to create.
-     * @returns the created ZFS dataset.
      */
-    async create(dataset) {
-        if (!this.exist()) {
-            throw new Error(`ZFS filesystem is not exist: ${this.#name}`);
-        }
-        await ZfsUtilities.createZfsDataset(dataset, this.#name);
-        return new ZfsFilesystem(`${this.#name}/${dataset}`);
+    async create() {
+        await ZfsUtilities.createZfsDataset(this.#name);
     }
 
     /**
      * Open the ZFS dataset on the filesystem.
      * @param {string} dataset the name of a ZFS dataset to open.
-     * @returns {Promise<ZfsFilesystem>} a ZfsFilesystem instance associated with the dataset.
+     * @returns {ZfsFilesystem} a ZfsFilesystem instance associated with the dataset.
      */
-    async open(dataset) {
+    open(dataset) {
         if (!this.exist()) {
-            throw new Error(`ZFS filesystem is not exist: ${this.#name}`);
+            throw new Error(`ZFS filesystem does not exist: ${this.#name}`);
         }
         return new ZfsFilesystem(`${this.#name}/${dataset}`);
     }
 
     /**
-     * Confirm a ZFS filesystem exists or not.
-     * @returns {Promise<boolean>} true if exist, false if not.
+     * Get a primary ZFS filesystem from an archive ZFS filesystem.
+     * @returns {ZfsFilesystem} the primary ZFS filesystem
      */
-    async exist() {
-        const included = ZfsFilesystem.#filesystemList.includes(this.name);
+    getPrimary() {
+        if (!this.exist()) {
+            throw new Error(`ZFS filesystem does not exist: ${this.#name}`);
+        }
+
+        const index = this.#name.indexOf('/');
+        if (index == -1) {
+            throw new Error(`ZFS filesystem does not have the primary name: ${this.#name}`);
+        }
+        const parentName = this.#name.substring(index + 1);
+        return new ZfsFilesystem(parentName);
+    }
+
+    /**
+     * Confirm a ZFS filesystem exists or not.
+     * @returns {boolean} true if exist, false if not.
+     */
+    exist() {
+        const included = ZfsFilesystem.#zfsFilesystemArray.includes(this.#name);
         return included;
     }
 
@@ -203,9 +224,15 @@ export class ZfsFilesystem {
      */
      async openRecursively() {
         const filesystems = await ZfsUtilities.filesystemList(this.#name);
-        const zfsFilesystems = 
-                filesystems.map((filesystem) => new ZfsFilesystem(filesystem));
-        return zfsFilesystems;
+
+        const children = filesystems
+                .filter(f => f.startsWith(this.#name))
+                .filter(f => f !== this.#name);
+
+        const childrenInstances = 
+                children.map( c => new ZfsFilesystem(c));
+
+        return childrenInstances;
     }
 
     /**
@@ -313,16 +340,163 @@ export class ZfsFilesystem {
      }
 
     /**
-     * Diff a snapshot and the current.
-     * @param {string} snapshot a snapshot on the ZFS filesystem.
-     * @returns {Promise<string>} a message of the difference.
+     * Whether this ZFS filesystem is mounted or not from the mounted property.
+     * @param {boolean} recursive confirm this filesystem recursively.
+     * @returns {Promise<boolean>} true if all the filesystems are mounted, otherwise false.
      */
-     async diff(snapshot) {
-        const message = await ZfsUtilities.diff(`${this.#name}@${snapshot}`, this.#name);
-        return message;
-     }
+    async mounted(recursive=false) {
+        const values = await ZfsUtilities.getValues(this.#name, 'mounted', recursive);
 
-    get name () {
+        // remove the '-' value standing for snapshot.
+        // snapshot is not ZFS pool and ZFS dataset.
+        const filesystemValues = values.filter(value => value !== '-');
+        const mounted = filesystemValues.every(v => v === 'yes');
+
+        return mounted;
+    }
+
+    /** @type {string|null} */
+    #mountPoint = null;
+    /**
+     * Get the mount point on the mountpoint property.
+     * @returns {Promise<string>} the mount point of this ZFS filesystems.
+     */
+    async getMountPoint() {
+        if (!this.#mountPoint) {
+            const values = await ZfsUtilities.getValues(this.#name, 'mountpoint');
+            this.#mountPoint = values[0];
+        }
+        return this.#mountPoint;
+    }
+
+    /**
+     * Compare two ZFS filesystems, print the differences on the stdout. 
+
+     * @param {ZfsFilesystem} another a ZFS filesystem to be compared
+     * @param {ZfsFilesystem[]} excludes the ZFS filesystems excluded on the comparing.
+     */
+    async compare(another, excludes) {
+        let onePath = await this.getMountPoint();
+        onePath = path.join(onePath, '/');
+
+        let anotherPath = await another.getMountPoint();
+        anotherPath = path.join(anotherPath, '/');
+
+        const excludePaths =
+                await Promise.all(excludes.map(async (e) => {
+                    const mountPoint = await e.getMountPoint();
+                    return mountPoint;
+                }));
+
+        const compare = new Compare()
+        await compare.compareDirectory(onePath, anotherPath, excludePaths)
+    }
+
+    get Name () {
         return this.#name;
+    }
+}
+
+class Compare {
+    /**
+     * Compare two directories recursively, print the differences with the logger. 
+     * 
+     * @param {string} one a
+     * @param {string} another
+     * @param {string[]} excludePaths 
+     */
+    async compareDirectory(one, another, excludePaths) {
+        if (excludePaths.includes(one)) {
+            return;
+        }
+
+        const entries = await fsPromises.readdir(one, {withFileTypes: true});
+
+        const directories = entries.filter(e => e.isDirectory());
+        const files = entries.filter(e => !e.isDirectory());
+
+        // compare the directories, move into the sub directory.
+        for (const directory of directories) {
+            const onePath = path.join(one, directory.name);
+            const anotherPath = path.join(another, directory.name);
+            if (!fs.existsSync(anotherPath)) {
+                logger.print(` + ${onePath}/`);
+            }
+
+            // move into the sub directory.
+            await this.compareDirectory(onePath, anotherPath, excludePaths);
+        }
+
+        // print all of the removed files.
+        if (fs.existsSync(another)) {
+            const anotherNames = await fsPromises.readdir(another);
+            for (const name of anotherNames) {
+                const onePath = path.join(one, name);
+                if (!fs.existsSync(onePath)) {
+                    logger.print(` - ${onePath}`);
+                }
+            }
+        }
+
+        // print all of the appended and modified files.
+        for (const file of files) {
+            const onePath = path.join(one, file.name);
+            const anotherPath = path.join(another, file.name);
+            if (!fs.existsSync(anotherPath)) {
+                logger.print(` + ${onePath}`);
+                continue;
+            }
+
+            const stat = await fsPromises.lstat(anotherPath);
+            if (stat.isDirectory()) {
+                logger.print(` M ${onePath}`);
+                continue;
+            }
+
+            const equal = await this.#equal(onePath, anotherPath);
+            if (equal) {
+                // logger.print(` K ${onePath}`)
+            }
+            else {
+                logger.print(` M ${onePath}`);
+            }
+        }
+    }
+
+    /**
+     * Compare files with the hash digest.
+     * @param {string} one a file
+     * @param {string} another another file
+     * @returns {Promise<boolean>} true if one is the same as another, false if difference.
+     */
+    async #equal(one, another) {
+        const oneDigest = await this.#digest(one);
+        const anotherDigest = await this.#digest(another);
+        const compareResult = oneDigest.compare(anotherDigest);
+        const equal = compareResult == 0;
+
+        return equal;
+    }
+
+    /**
+     * Calculate the hash digest of a file.
+     * @param {string} fileName the name of a file.
+     * @returns {Promise<Buffer>} a hash digest.
+     */
+    async #digest(fileName) {
+        const hash = createHash('sha512');
+
+        const fileHandle = await fsPromises.open(fileName);
+        try {
+            const readStream = fileHandle.createReadStream();
+
+            await streamPromises.pipeline(readStream, hash);
+        }
+        finally {
+            fileHandle.close();
+        }
+
+        const digest = hash.digest();
+        return digest;
     }
 }

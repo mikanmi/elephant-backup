@@ -26,9 +26,20 @@ export class Process {
     #pipedProcess = null;
 
     /**
-     * @type {((data: any) => void)|null}
+     * @type {((data: any) => void)}
      */
-    #stderrHandler = null;
+    #stderrHandler;
+
+    /**
+     * @type {((data: any) => void)}
+     */
+    #stdoutHandler;
+
+    /**
+     * Get the stdout as the return value.
+     * @type {boolean}
+     */
+    #syncResult = false;
 
     /**
      * Print the standard out immediately.
@@ -43,13 +54,27 @@ export class Process {
     constructor(commandWithArgs) {
         this.#commandWithArguments = commandWithArgs;
 
-        this.setStdErrHandler((data) => {
-            // print stderr using the logger if printStderr is 'logger'.
+        /**
+         * the default standard error handler.
+         * the handler print a error message with logger.
+         * @param {any} data
+         */
+        function defaultStdoutHandler(data) {
             const dataString = data.toString().trimEnd();
+            logger.print(`\n${dataString}`);
+        };
+        this.#stdoutHandler = defaultStdoutHandler;
 
-            // print the child's stderr immediately on the application stdout.
+        /**
+         * the default standard error handler.
+         * the handler print a error message with logger.
+         * @param {any} data
+         */
+        function defaultStderrHandler(data) {
+            const dataString = data.toString().trimEnd();
             logger.error(`${dataString}`);
-        });
+        };
+        this.#stderrHandler = defaultStderrHandler;
     }
 
     /**
@@ -78,10 +103,8 @@ export class Process {
         const cmd = tokens[0];
         tokens.splice(0, 1);
 
-        const child = this.#stderrHandler ?
-                child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'pipe']}) :
-                child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'ignore']});
-
+        const child = 
+                child_process.spawn(cmd, tokens, {stdio: ['pipe', 'pipe', 'pipe']});
         const promises = [];
 
         // relay the stdin variable to the child's stdin.
@@ -113,16 +136,17 @@ export class Process {
             // skip this stdout handler if piped stdout to the child's stdin
             if (!this.#pipedProcess) {
                 child.stdout?.on('data', (data) => {
-                    const dataString = data.toString().trimEnd();
-                    stdout += dataString;
-                    if (this.printStdoutImmediately) {
-                        // print the child's stdout immediately on the application stdout.
-                        logger.print(`\n${dataString}`);
+                    if (this.#syncResult) {
+                        const dataString = data.toString().trimEnd();
+                        stdout += dataString;
+                    }
+                    else {
+                        this.#stdoutHandler.call(this, data);
                     }
                 });
             }
             child.stderr?.on('data', (data) => {
-                this.#stderrHandler?.call(this, data);
+                this.#stderrHandler.call(this, data);
             });
 
             child.on('spawn', () => {
@@ -173,9 +197,24 @@ export class Process {
 
     /**
      * Set a standard error handler to this instance.
-     * @param {((data: any) => void)|null} handler intercept and pass the data to the handler if a standard error occurred.
+     * @param {((data: any) => void)} handler a standard error handler, which handles the standard error message.
      */
-     setStdErrHandler(handler) {
+     setStderrHandler(handler) {
         this.#stderrHandler = handler;
+    }
+
+    /**
+     * Set a standard out handler to this instance.
+     * @param {((data: any) => void)} handler a standard out handler, which handles the standard out message.
+     */
+     setStdoutHandler(handler) {
+        this.#stdoutHandler = handler;
+    }
+
+    /**
+     * Change the standout behavior to get the standout as the return value.
+     */
+     syncResult() {
+        this.#syncResult = true;
     }
 }
