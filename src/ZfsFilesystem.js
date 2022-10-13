@@ -528,14 +528,19 @@ class Compare {
     async #digest(fileName) {
         const hash = createHash('sha1');
 
-        const fileHandle = await fsPromises.open(fileName);
-        try {
-            const readStream = fileHandle.createReadStream();
+        /** @type {fs.promises.FileHandle|null} */
+        let fileHandle = null;
+        /** @type {fs.ReadStream|null} */
+        let readStream = null;
 
+        try {
+            fileHandle = await fsPromises.open(fileName);
+            readStream = fileHandle.createReadStream();
             await streamPromises.pipeline(readStream, hash);
         }
         finally {
-            fileHandle.close();
+            readStream?.close();
+            fileHandle?.close();
         }
 
         const digest = hash.digest();
