@@ -27,6 +27,12 @@ echo '====================>'
 elephant-backup backup -p -a ${ARCHIVE} ${PRIMARIES}
 echo '\n'
 
+echo 'Mount the archive filesystem.'
+echo '====================>'
+zfs load-key -a
+zfs mount -a
+echo '\n'
+
 echo 'Verify the the archive filesystem using the diff subcommand.'
 echo 'We expect no differences.'
 echo '====================>'
