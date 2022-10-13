@@ -62,7 +62,7 @@ export class Process {
         function defaultStdoutHandler(data) {
             const dataString = data.toString().trimEnd();
             logger.print(`\n${dataString}`);
-        };
+        }
         this.#stdoutHandler = defaultStdoutHandler;
 
         /**
@@ -73,7 +73,7 @@ export class Process {
         function defaultStderrHandler(data) {
             const dataString = data.toString().trimEnd();
             logger.error(`${dataString}`);
-        };
+        }
         this.#stderrHandler = defaultStderrHandler;
     }
 
