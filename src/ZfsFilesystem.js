@@ -401,9 +401,9 @@ class Compare {
     /**
      * Compare two directories recursively, print the differences with the logger. 
      * 
-     * @param {string} one a
-     * @param {string} another
-     * @param {string[]} excludePaths 
+     * @param {string} one the path of a directory.
+     * @param {string} another the path of another directory.
+     * @param {string[]} excludePaths the path to be excluded from comparing.
      */
     async compareDirectory(one, another, excludePaths) {
         if (excludePaths.includes(one)) {
@@ -411,7 +411,6 @@ class Compare {
         }
 
         const entries = await fsPromises.readdir(one, {withFileTypes: true});
-
         const directories = entries.filter(e => e.isDirectory());
         const files = entries.filter(e => !e.isDirectory());
 
@@ -427,14 +426,32 @@ class Compare {
             await this.compareDirectory(onePath, anotherPath, excludePaths);
         }
 
+        // print all the files, if the appended directory.
+        if (!fs.existsSync(another)) {
+            for (const file of files) {
+                const onePath = path.join(one, file.name);
+                logger.print(` + ${onePath}`);
+            }
+            return;
+        }
+
+        // print the difference of files.
+        this.#printDifference(files, one, another);
+    }
+
+    /**
+     * Print the difference of files.
+     * @param {fs.Dirent[]} files 
+     * @param {string} one 
+     * @param {string} another 
+     */
+    async #printDifference(files, one, another) {
         // print all of the removed files.
-        if (fs.existsSync(another)) {
-            const anotherNames = await fsPromises.readdir(another);
-            for (const name of anotherNames) {
-                const onePath = path.join(one, name);
-                if (!fs.existsSync(onePath)) {
-                    logger.print(` - ${onePath}`);
-                }
+        const anotherNames = await fsPromises.readdir(another);
+        for (const name of anotherNames) {
+            const onePath = path.join(one, name);
+            if (!fs.existsSync(onePath)) {
+                logger.print(` - ${onePath}`);
             }
         }
 
