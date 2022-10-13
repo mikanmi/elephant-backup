@@ -61,7 +61,7 @@ export class SubCommand {
             logger.exit('Any ZFS filesystems are not accessible.');
         }
 
-        this.run();
+        await this.run();
     }
 
     /**

@@ -436,7 +436,7 @@ class Compare {
         }
 
         // print the difference of files.
-        this.#printDifference(files, one, another);
+        await this.#printDifference(files, one, another);
     }
 
     /**
