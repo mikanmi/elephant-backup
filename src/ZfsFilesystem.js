@@ -414,6 +414,15 @@ class Compare {
         const directories = entries.filter(e => e.isDirectory());
         const files = entries.filter(e => !e.isDirectory());
 
+        // print all the files, if the directory itself is appended.
+        if (!fs.existsSync(another)) {
+            for (const file of files) {
+                const onePath = path.join(one, file.name);
+                logger.print(` + ${onePath}`);
+            }
+            return;
+        }
+
         // compare the directories, move into the sub directory.
         for (const directory of directories) {
             const onePath = path.join(one, directory.name);
@@ -424,15 +433,6 @@ class Compare {
 
             // move into the sub directory.
             await this.compareDirectory(onePath, anotherPath, excludePaths);
-        }
-
-        // print all the files, if the appended directory.
-        if (!fs.existsSync(another)) {
-            for (const file of files) {
-                const onePath = path.join(one, file.name);
-                logger.print(` + ${onePath}`);
-            }
-            return;
         }
 
         // print the difference of files.
