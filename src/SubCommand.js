@@ -181,7 +181,7 @@ class BackupSubCommand extends SubCommand {
         if (latestOfCommonSnapshot == null) {
             const earliestPrimarySnapshot = primarySnapshotList.getEarliest();
             if (!earliestPrimarySnapshot) {
-                throw new Error(`No snapshots on the ${primary}`);
+                throw new Error(`No snapshots on the ${primary.Name}`);
             }
 
             // estimate the backup size of the earliest snapshot of the primary.
@@ -240,7 +240,7 @@ class DiffSubCommand extends SubCommand {
             const archive = archiveRoot.open(primaryArg);
             const exist = archive.exist();
             if (!exist) {
-                logger.error(`${primaryArg} is not archived on ${archive} yet.`);
+                logger.error(`${primaryArg} is not archived on ${archive.Name} yet.`);
                 return false;
             }
         }
