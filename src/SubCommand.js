@@ -275,8 +275,6 @@ class DiffSubCommand extends SubCommand {
      * @param {ZfsFilesystem} archiveRoot a archive ZFS filesystem.
      */
     async #compare(primary, archiveRoot) {
-        logger.print(`Printing the differences of ${primary.Name} and ${archiveRoot.Name}`);
-
         if (!await primary.mounted(true)) {
             logger.warn(`The primary ZFS filesystem containing unmounted filesystems: ${primary.Name}`);
             return;
@@ -284,27 +282,29 @@ class DiffSubCommand extends SubCommand {
 
         const archive = archiveRoot.open(primary.Name);
         if (!await archive.mounted(true)) {
-            logger.warn(`The archive ZFS dataset containing unmounted filesystems: ${archiveRoot.Name}`);
+            logger.warn(`The archive ZFS dataset containing unmounted filesystems: ${archive.Name}`);
             return;
         }
 
-        const children = await primary.openRecursively();
-        const primaryRecursive = [primary, ...children];
+        logger.print(`Printing the differences of ${primary.Name} and ${archive.Name}`);
 
-        // compare primary ZFS filesystem containing child ZFS dataset.
-        for (const child of primaryRecursive) {
+        const descendant = await primary.openRecursively();
+        const primaryDescendants = [primary, ...descendant];
 
-            // child exists on the archive. 
-            const another = archiveRoot.open(child.Name);
+        // the primary ZFS filesystem containing descendant ZFS datasets.
+        // compare each primary and descendant ZFS filesystems.
+        for (const descendant of primaryDescendants) {
+            // descendant exists on the archive. 
+            const another = archiveRoot.open(descendant.Name);
             const exist = another.exist();
             if (!exist) {
-                logger.print(`an new ZFS dataset: ${child.Name}`);
+                logger.print(`an new ZFS dataset: ${descendant.Name}`);
                 continue;
             }
 
             // print the differences between dataset and attempt.
-            const excludes = primaryRecursive.filter(p => p !== child);
-            await child.compare(another, excludes);
+            const excludes = primaryDescendants.filter(p => p !== descendant);
+            await descendant.compare(another, excludes);
         }
     }
 }

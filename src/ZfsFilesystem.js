@@ -384,12 +384,17 @@ export class ZfsFilesystem {
 
         const excludePaths =
                 await Promise.all(excludes.map(async (e) => {
-                    const mountPoint = await e.getMountPoint();
+                    let mountPoint = await e.getMountPoint();
+                    mountPoint = path.join(mountPoint, '/');
                     return mountPoint;
                 }));
 
-        const compare = new Compare()
-        await compare.compareDirectory(onePath, anotherPath, excludePaths)
+        const excludeAnotherPaths = excludePaths
+                .filter( e => !e.startsWith(onePath) )
+                .map( e => path.join(anotherPath, e, '/'));
+
+        const compare = new Compare(excludePaths, excludeAnotherPaths);
+        await compare.compareDirectory(onePath, anotherPath);
     }
 
     get Name () {
@@ -398,15 +403,30 @@ export class ZfsFilesystem {
 }
 
 class Compare {
+
+    #excludePaths;
+
+    #excludeAnotherPaths;
+
+    /**
+     * Compare two directories recursively, print the differences with the logger. 
+     * 
+     * @param {string[]} excludePaths the path to be excluded from one on comparing.
+     * @param {string[]} excludeAnotherPaths) the path to be excluded from another on comparing.
+     */
+    constructor(excludePaths, excludeAnotherPaths) {
+        this.#excludePaths = excludePaths;
+        this.#excludeAnotherPaths = excludeAnotherPaths;
+    }
+
     /**
      * Compare two directories recursively, print the differences with the logger. 
      * 
      * @param {string} one the path of a directory.
      * @param {string} another the path of another directory.
-     * @param {string[]} excludePaths the path to be excluded from comparing.
      */
-    async compareDirectory(one, another, excludePaths) {
-        if (excludePaths.includes(one)) {
+    async compareDirectory(one, another) {
+        if (this.#excludePaths.includes(one)) {
             return;
         }
 
@@ -425,14 +445,14 @@ class Compare {
 
         // compare the directories, move into the sub directory.
         for (const directory of directories) {
-            const onePath = path.join(one, directory.name);
-            const anotherPath = path.join(another, directory.name);
+            const onePath = path.join(one, directory.name, '/');
+            const anotherPath = path.join(another, directory.name, '/');
             if (!fs.existsSync(anotherPath)) {
-                logger.print(` + ${onePath}/`);
+                logger.print(` + ${onePath}`);
             }
 
-            // move into the sub directory.
-            await this.compareDirectory(onePath, anotherPath, excludePaths);
+            // move into the sub direct
+            await this.compareDirectory(onePath, anotherPath);
         }
 
         // print the difference of files.
@@ -442,13 +462,18 @@ class Compare {
     /**
      * Print the difference of files.
      * @param {fs.Dirent[]} files 
-     * @param {string} one 
-     * @param {string} another 
+     * @param {string} one the path of a directory.
+     * @param {string} another the path of another directory.
      */
     async #printDifference(files, one, another) {
         // print all of the removed files.
         const anotherNames = await fsPromises.readdir(another);
         for (const name of anotherNames) {
+            // skip another exclude path
+            const anotherPath = path.join(another, name);
+            if (this.#excludeAnotherPaths.indexOf(anotherPath)) {
+                continue;
+            }
             const onePath = path.join(one, name);
             if (!fs.existsSync(onePath)) {
                 logger.print(` - ${onePath}`);
@@ -501,7 +526,7 @@ class Compare {
      * @returns {Promise<Buffer>} a hash digest.
      */
     async #digest(fileName) {
-        const hash = createHash('sha512');
+        const hash = createHash('sha1');
 
         const fileHandle = await fsPromises.open(fileName);
         try {
